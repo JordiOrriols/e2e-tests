@@ -1,0 +1,31 @@
+{
+  "name": "@jordiorriols/e2e-tests",
+  "version": "1.0.0",
+  "description": "E2E tests for jordiorriols projects using Playwright",
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:headed": "playwright test --headed",
+    "test:ui": "playwright test --ui",
+    "test:debug": "playwright test --debug",
+    "test:website": "playwright test --project=website-localhost --project=website-production",
+    "test:airmap": "playwright test --project=airmap-localhost --project=airmap-production",
+    "test:ladders": "playwright test --project=ladders-localhost --project=ladders-production",
+    "test:localhost": "playwright test --project=website-localhost --project=airmap-localhost --project=ladders-localhost",
+    "test:production": "playwright test --project=website-production --project=airmap-production --project=ladders-production",
+    "test:visual": "playwright test --grep @visual",
+    "test:visual:update": "playwright test --grep @visual --update-snapshots",
+    "compare": "tsx scripts/compare-screenshots.ts",
+    "report": "playwright show-report",
+    "codegen": "playwright codegen"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.48.0",
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
