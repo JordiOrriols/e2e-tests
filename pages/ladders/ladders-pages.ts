@@ -44,15 +44,11 @@ export class LaddersHomePage extends BasePage {
   }
 
   get addMemberButton(): Locator {
-    return this.page.getByTestId("add-member-button").or(
-      this.page.getByRole("button", { name: /add.*member/i })
-    );
+    return this.page.getByTestId("add-member-button").first();
   }
 
   get referenceButton(): Locator {
-    return this.page.getByTestId("reference-button").or(
-      this.page.getByRole("button", { name: /reference/i })
-    );
+    return this.page.getByTestId("reference-button").first();
   }
 
   // Tabs using data-testid

@@ -16,36 +16,42 @@ test.describe("Website Home Page", () => {
     const homePage = new WebsiteHomePage(page);
     await homePage.goto();
 
-    // Check for main content using data-testid with fallback
-    const mainContent = page.getByTestId("main-content").or(page.locator("main, #root")).first();
-    await expect(mainContent).toBeVisible();
+    // Check for main content using data-testid
+    await expect(page.getByTestId("main-content")).toBeVisible();
   });
 
   test("should display home section", async ({ page }) => {
     const homePage = new WebsiteHomePage(page);
     await homePage.goto();
 
-    // Check for home section using data-testid with fallback
-    const homeSection = page.getByTestId("home-section").or(page.locator("section, [class*='card']")).first();
-    await expect(homeSection).toBeVisible();
+    // Check for home section using data-testid
+    await expect(page.getByTestId("home-section")).toBeVisible();
   });
 
   test("should display profile info", async ({ page }) => {
     const homePage = new WebsiteHomePage(page);
     await homePage.goto();
 
-    // Check profile elements using data-testid with fallback
-    const profileName = page.getByTestId("profile-name").or(page.locator("h1")).first();
-    await expect(profileName).toBeVisible();
+    // Check profile elements using data-testid
+    await expect(page.getByTestId("profile-info")).toBeVisible();
+    await expect(page.getByTestId("profile-name")).toBeVisible();
+    await expect(page.getByTestId("profile-title")).toBeVisible();
+  });
+
+  test("should display profile avatar", async ({ page }) => {
+    const homePage = new WebsiteHomePage(page);
+    await homePage.goto();
+
+    // Check avatar using data-testid
+    await expect(page.getByTestId("profile-avatar")).toBeVisible();
   });
 
   test("should display stats section", async ({ page }) => {
     const homePage = new WebsiteHomePage(page);
     await homePage.goto();
 
-    // Check stats section using data-testid with fallback to any button group
-    const statsSection = page.getByTestId("stats-section").or(page.locator("[role='group'], button")).first();
-    await expect(statsSection).toBeVisible();
+    // Check stats section using data-testid
+    await expect(page.getByTestId("stats-section")).toBeVisible();
   });
 
   test("should be responsive", async ({ page }) => {
@@ -54,18 +60,17 @@ test.describe("Website Home Page", () => {
     // Test desktop
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
-    const mainContent = page.getByTestId("home-section").or(page.locator("main, section")).first();
-    await expect(mainContent).toBeVisible();
+    await expect(page.getByTestId("home-section")).toBeVisible();
 
     // Test tablet
     await page.setViewportSize({ width: 768, height: 1024 });
     await waitForPageReady(page);
-    await expect(mainContent).toBeVisible();
+    await expect(page.getByTestId("home-section")).toBeVisible();
 
     // Test mobile
     await page.setViewportSize({ width: 375, height: 667 });
     await waitForPageReady(page);
-    await expect(mainContent).toBeVisible();
+    await expect(page.getByTestId("home-section")).toBeVisible();
   });
 });
 
@@ -74,37 +79,34 @@ test.describe("Website Language", () => {
     const homePage = new WebsiteHomePage(page);
     await homePage.goto();
 
-    // Language selector should be visible using data-testid with fallback
-    const langSelector = page.getByTestId("language-selector").or(page.locator("nav[aria-label*='Language'], nav[aria-label*='language']"));
-    await expect(langSelector).toBeVisible();
+    // Language selector using data-testid
+    await expect(page.getByTestId("language-selector")).toBeVisible();
   });
 
   test("should have language buttons", async ({ page }) => {
     const homePage = new WebsiteHomePage(page);
     await homePage.goto();
 
-    // Check each language button using data-testid with fallback
-    const enButton = page.getByTestId("language-button-en").or(page.locator("button:has-text('EN'), [aria-label*='English']")).first();
-    await expect(enButton).toBeVisible();
+    // Check each language button using data-testid
+    await expect(page.getByTestId("language-button-en")).toBeVisible();
+    await expect(page.getByTestId("language-button-es")).toBeVisible();
+    await expect(page.getByTestId("language-button-ca")).toBeVisible();
   });
 
   test("should switch language", async ({ page }) => {
     const homePage = new WebsiteHomePage(page);
     await homePage.goto();
 
-    // Click Spanish button using data-testid with fallback
-    const esButton = page.getByTestId("language-button-es").or(page.locator("button:has-text('ES'), [aria-label*='Spanish']")).first();
-    await esButton.click();
+    // Click Spanish button using data-testid
+    await page.getByTestId("language-button-es").click();
     await page.waitForTimeout(500);
 
     // Click Catalan button
-    const caButton = page.getByTestId("language-button-ca").or(page.locator("button:has-text('CA'), [aria-label*='Catalan']")).first();
-    await caButton.click();
+    await page.getByTestId("language-button-ca").click();
     await page.waitForTimeout(500);
 
     // Click English button
-    const enButton = page.getByTestId("language-button-en").or(page.locator("button:has-text('EN'), [aria-label*='English']")).first();
-    await enButton.click();
+    await page.getByTestId("language-button-en").click();
     await page.waitForTimeout(500);
 
     // Test passes if no errors

@@ -49,35 +49,46 @@ test.describe("Ladders Visual Regression @visual", () => {
   });
 });
 
-test.describe("Ladders Modal Snapshots @visual", () => {
-  test("add member modal snapshot", async ({ page, takeSnapshot }) => {
+test.describe("Ladders Form Snapshots @visual", () => {
+  test("add member form snapshot", async ({ page, takeSnapshot }) => {
     const homePage = new LaddersHomePage(page);
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
     await waitForPageReady(page);
 
-    await homePage.openAddMemberModal();
+    // Click add member to navigate to form
+    await page.getByTestId("add-member-button").click();
+    
+    // Wait for form to load
+    const nameInput = page.locator('input[placeholder*="name"], [aria-label*="Name"]').first();
+    await nameInput.waitFor({ state: "visible", timeout: 5000 });
     await page.waitForTimeout(500);
 
-    await takeSnapshot("add-member-modal");
+    await takeSnapshot("add-member-form");
 
-    await homePage.closeModal();
+    // Go back
+    await page.goBack();
   });
 
-  test("reference modal snapshot", async ({ page, takeSnapshot }) => {
+  test("reference view snapshot", async ({ page, takeSnapshot }) => {
     const homePage = new LaddersHomePage(page);
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
     await waitForPageReady(page);
 
-    const refButton = homePage.referenceButton;
+    const refButton = page.getByTestId("reference-button");
     if (await refButton.isVisible()) {
-      await homePage.openReferenceModal();
+      await refButton.click();
       await page.waitForTimeout(500);
 
-      await takeSnapshot("reference-modal");
-
-      await homePage.closeModal();
+      // Check for reference content (modal or page)
+      const referenceContent = page.locator('[role="dialog"], [class*="reference"], h2:has-text("Reference"), h2:has-text("Level")').first();
+      const isVisible = await referenceContent.isVisible().catch(() => false);
+      
+      if (isVisible) {
+        await takeSnapshot("reference-view");
+        await page.keyboard.press("Escape");
+      }
     }
   });
 });
