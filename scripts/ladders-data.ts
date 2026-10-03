@@ -313,6 +313,36 @@ export class LaddersData {
     });
   }
 
+  /**
+   * Creates a goal without going through the form.
+   *
+   * The payload is exactly the one the app writes, and that is deliberate: the
+   * live project grants INSERT on smart_goals column by column, so naming
+   * `comments` in the body is refused outright with "permission denied for table
+   * smart_goals" even though reading and updating the column both work.
+   */
+  async createGoal(input: {
+    memberId: string;
+    title: string;
+    description?: string;
+    dueDate?: string | null;
+  }): Promise<GoalRow> {
+    const rows = await this.request<GoalRow[]>("smart_goals", {
+      method: "POST",
+      prefer: "return=representation",
+      body: JSON.stringify({
+        member_id: input.memberId,
+        title: input.title,
+        description: input.description ?? "",
+        due_date: input.dueDate ?? null,
+        progress: 0,
+      }),
+    });
+    const row = rows[0];
+    if (!row?.id) throw new Error("the goal insert returned no row");
+    return row;
+  }
+
   listGoals(memberId: string): Promise<GoalRow[]> {
     return this.request<GoalRow[]>(
       `smart_goals?member_id=eq.${memberId}&select=*&order=created_at`,
@@ -326,10 +356,20 @@ export class LaddersData {
     });
   }
 
+  /** Renames a goal, which is what an update of an untouched goal looks like. */
+  async renameGoal(goalId: string, title: string): Promise<void> {
+    await this.request(`smart_goals?id=eq.${goalId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ title }),
+    });
+  }
+
   /**
-   * Replaces the comment list of a goal outright. A manager is allowed to update
-   * a goal, so this only fails if the comments themselves are protected, which
-   * is the point of asking.
+   * Replaces the comment list of a goal outright, which is the one edit the
+   * database is not supposed to allow. Note that the live project never gets far
+   * enough to answer: it grants UPDATE on smart_goals column by column and
+   * leaves out comments, so the refusal is a permission error rather than the
+   * immutable trigger. Either way the thread cannot be rewritten.
    */
   async replaceGoalComments(
     goalId: string,

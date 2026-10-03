@@ -305,6 +305,16 @@ export class LaddersApp {
     return id;
   }
 
+  /**
+   * Opens the goals tab on whichever screen is showing. Both the manager's
+   * assessment and the shared view page have one, and the evaluated person needs
+   * the same way in from the second one.
+   */
+  async openGoalsTab(): Promise<void> {
+    await this.page.getByTestId("assessment-tab-goals").click();
+    await expect(this.page.getByTestId("goals-panel")).toBeVisible();
+  }
+
   /** Goals live on the assessment screen, behind a tab that managers only get. */
   async openGoals(memberName: string): Promise<string> {
     const id = await this.openTeamMember(memberName);
