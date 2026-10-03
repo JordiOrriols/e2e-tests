@@ -1,26 +1,41 @@
-import { chromium } from "@playwright/test";
-import { readFileSync } from "node:fs";
+import { chromium, type Browser } from "@playwright/test";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { projectConfigs } from "../playwright.config";
 
 /**
- * Signs a test user in and stores the session for Playwright to reuse.
+ * Signs the test users in and stores their sessions for Playwright to reuse.
  *
  * Runs against the Supabase password grant directly instead of driving the app's
  * login dialog. That keeps the auth setup independent from the login UI, which
  * is being moved into the shared @jordiorriols/ui library and would otherwise
  * break these tests every time it changes.
  *
- * Credentials come from the environment (LADDERS_TEST_EMAIL /
- * LADDERS_TEST_PASSWORD). The Supabase URL and publishable key are public values
- * read from the app's own .env.
+ * Credentials come from the environment. The Supabase URL and publishable key
+ * are public values read from the app's own .env.
+ *
+ * Two accounts exist: the primary one owns the data, the secondary one is the
+ * other side of a shared team. The secondary is optional, because an account
+ * that has not confirmed its email yet cannot sign in; the sharing suite skips
+ * the collaborator side until it can.
  */
 
 const LAD_DIR = resolve(import.meta.dirname, "../../ladders");
-const STATE_PATH = resolve(
+
+export const PRIMARY_STATE_PATH = resolve(
   import.meta.dirname,
   "../auth/ladders-storage-state.json",
 );
+
+export const SECOND_STATE_PATH = resolve(
+  import.meta.dirname,
+  "../auth/ladders-storage-state-2.json",
+);
+
+/** True when the collaborator session is available for the sharing suite. */
+export function hasSecondAccount(): boolean {
+  return existsSync(SECOND_STATE_PATH);
+}
 
 type Env = Record<string, string | undefined>;
 
@@ -111,52 +126,13 @@ async function signIn(
   };
 }
 
-export default async function globalSetup(): Promise<void> {
-  // The sign-in is only needed for the local ladders app. Skip it for website,
-  // airmap and ladders-production runs so they do not depend on these credentials.
-  if (!runsLaddersLocalhost()) {
-    return;
-  }
-
-  const email = process.env.LADDERS_TEST_EMAIL;
-  const password = process.env.LADDERS_TEST_PASSWORD;
-
-  const appEnv = readAppEnv();
-  const url = appEnv.VITE_SUPABASE_URL;
-  const publishableKey = appEnv.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-  if (!url || !publishableKey) {
-    throw new Error(
-      "ladders/.env is missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY",
-    );
-  }
-  if (!email || !password) {
-    throw new Error(
-      "Set LADDERS_TEST_EMAIL and LADDERS_TEST_PASSWORD to run the ladders tests. " +
-        "On this machine they are resolved from the login keychain via ~/.zshrc.",
-    );
-  }
-
-  const {
-    access_token,
-    refresh_token,
-    expires_at,
-    expires_in,
-    token_type,
-    user,
-  } = await signIn(url, publishableKey, email, password);
-
-  const storageKey = `sb-${projectRef(url)}-auth-token`;
-  const session: SupabaseSession = {
-    access_token,
-    refresh_token,
-    expires_at,
-    expires_in,
-    token_type,
-    user,
-  };
-
-  const browser = await chromium.launch({ headless: true });
+/** Seeds a session into a throwaway context and saves the resulting state. */
+async function saveStorageState(
+  browser: Browser,
+  storageKey: string,
+  session: SupabaseSession,
+  statePath: string,
+): Promise<void> {
   const context = await browser.newContext();
   const page = await context.newPage();
 
@@ -171,8 +147,94 @@ export default async function globalSetup(): Promise<void> {
   await page.goto(projectConfigs.ladders.localhost);
   await page.waitForLoadState("domcontentloaded");
 
-  await context.storageState({ path: STATE_PATH });
-  await browser.close();
+  await context.storageState({ path: statePath });
+  await context.close();
+}
 
-  console.log(`[ladders-auth] signed in as ${email} and saved ${STATE_PATH}`);
+type Account = {
+  email: string;
+  password: string;
+  statePath: string;
+  /** The primary account owns the seeded data, so it cannot be skipped. */
+  required: boolean;
+};
+
+export default async function globalSetup(): Promise<void> {
+  // The sign-in is only needed for the local ladders app. Skip it for website,
+  // airmap and ladders-production runs so they do not depend on these credentials.
+  if (!runsLaddersLocalhost()) {
+    return;
+  }
+
+  const appEnv = readAppEnv();
+  const url = appEnv.VITE_SUPABASE_URL;
+  const publishableKey = appEnv.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!url || !publishableKey) {
+    throw new Error(
+      "ladders/.env is missing VITE_SUPABASE_URL or VITE_SUPABASE_PUBLISHABLE_KEY",
+    );
+  }
+
+  const accounts: Account[] = [
+    {
+      email: process.env.LADDERS_TEST_EMAIL ?? "",
+      password: process.env.LADDERS_TEST_PASSWORD ?? "",
+      statePath: PRIMARY_STATE_PATH,
+      required: true,
+    },
+    {
+      email: process.env.LADDERS_TEST2_EMAIL ?? "",
+      password: process.env.LADDERS_TEST2_PASSWORD ?? "",
+      statePath: SECOND_STATE_PATH,
+      required: false,
+    },
+  ];
+
+  const primary = accounts[0];
+  if (!primary.email || !primary.password) {
+    throw new Error(
+      "Set LADDERS_TEST_EMAIL and LADDERS_TEST_PASSWORD to run the ladders tests. " +
+        "On this machine they are resolved from the login keychain via ~/.zshrc.",
+    );
+  }
+
+  const browser = await chromium.launch({ headless: true });
+  try {
+    for (const account of accounts) {
+      if (!account.email || !account.password) {
+        if (account.required) continue;
+        console.warn(
+          "[ladders-auth] second account not configured, sharing suite will skip the collaborator side",
+        );
+        continue;
+      }
+      try {
+        const session = await signIn(
+          url,
+          publishableKey,
+          account.email,
+          account.password,
+        );
+        await saveStorageState(
+          browser,
+          `sb-${projectRef(url)}-auth-token`,
+          session,
+          account.statePath,
+        );
+        console.log(`[ladders-auth] signed in and saved ${account.statePath}`);
+      } catch (error) {
+        if (account.required) throw error;
+        // A registered but unconfirmed account cannot sign in. That is a state
+        // of the account, not a broken suite, so warn instead of failing.
+        console.warn(
+          `[ladders-auth] second account could not sign in (${
+            error instanceof Error ? error.message.split("\n")[0] : "unknown"
+          }), sharing suite will skip the collaborator side`,
+        );
+      }
+    }
+  } finally {
+    await browser.close();
+  }
 }
