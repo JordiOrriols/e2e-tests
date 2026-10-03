@@ -30,10 +30,10 @@ test.describe("Ladders Visual Regression @visual", () => {
     await takeSnapshot("home-mobile");
   });
 
-  test("should match production and localhost @compare", async ({ 
-    page, 
+  test("should match production and localhost @compare", async ({
+    page,
     environment,
-    getComparisonUrl 
+    getComparisonUrl,
   }) => {
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
@@ -42,10 +42,13 @@ test.describe("Ladders Visual Regression @visual", () => {
     console.log(`Current environment: ${environment}`);
     console.log(`Comparison URL: ${getComparisonUrl("/")}`);
 
-    await expect(page).toHaveScreenshot(`ladders-${environment}-home-compare.png`, {
-      fullPage: true,
-      maxDiffPixelRatio: 0.05,
-    });
+    await expect(page).toHaveScreenshot(
+      `ladders-${environment}-home-compare.png`,
+      {
+        fullPage: true,
+        maxDiffPixelRatio: 0.05,
+      },
+    );
   });
 });
 
@@ -57,11 +60,14 @@ test.describe("Ladders Form Snapshots @visual", () => {
     await waitForPageReady(page);
 
     // Click add member to navigate to form
+    await page.getByTestId("tab-team").click();
     await page.getByTestId("add-member-button").click();
-    
+
     // Wait for form to load
-    const nameInput = page.locator('input[placeholder*="name"], [aria-label*="Name"]').first();
-    await nameInput.waitFor({ state: "visible", timeout: 5000 });
+    const nameInput = page
+      .locator('input[placeholder*="name"], [aria-label*="Name"]')
+      .first();
+    await nameInput.waitFor({ state: "visible" });
     await page.waitForTimeout(500);
 
     await takeSnapshot("add-member-form");
@@ -82,9 +88,13 @@ test.describe("Ladders Form Snapshots @visual", () => {
       await page.waitForTimeout(500);
 
       // Check for reference content (modal or page)
-      const referenceContent = page.locator('[role="dialog"], [class*="reference"], h2:has-text("Reference"), h2:has-text("Level")').first();
+      const referenceContent = page
+        .locator(
+          '[role="dialog"], [class*="reference"], h2:has-text("Reference"), h2:has-text("Level")',
+        )
+        .first();
       const isVisible = await referenceContent.isVisible().catch(() => false);
-      
+
       if (isVisible) {
         await takeSnapshot("reference-view");
         await page.keyboard.press("Escape");
