@@ -5,6 +5,7 @@ import {
   type Page,
 } from "@playwright/test";
 import { LaddersData } from "../../scripts/ladders-data";
+import { SECOND_STATE_PATH } from "../../scripts/ladders-auth";
 import { projectConfigs } from "../../playwright.config";
 import { LaddersApp } from "./ladders-app";
 
@@ -44,10 +45,20 @@ export type SharedSession = {
   open: (path: string) => Promise<void>;
 };
 
+/**
+ * The other side of a shared team.
+ *
+ * Signed in as the second test account, so sharing is proved between two real
+ * users rather than by calling the API as the owner. Only usable once that
+ * account can sign in; the sharing suite skips otherwise.
+ */
+export type CollaboratorSession = SharedSession;
+
 export const test = base.extend<{
   data: LaddersData;
   defaultTeamName: string;
   shared: SharedSession;
+  collaborator: CollaboratorSession;
 }>({
   data: async ({}, use) => {
     const data = new LaddersData();
@@ -74,6 +85,25 @@ export const test = base.extend<{
         // A hash only change to the very same URL is a same document
         // navigation, so the page would keep the state from the last visit.
         // Reloading keeps "open the link again" meaning what it says.
+        const target = new URL(path, projectConfigs.ladders.localhost).href;
+        if (page.url() === target) await page.reload();
+        else await page.goto(path);
+      },
+    });
+    await context.close();
+  },
+
+  collaborator: async ({ browser }, use) => {
+    const context = await browser.newContext({
+      baseURL: projectConfigs.ladders.localhost,
+      storageState: SECOND_STATE_PATH,
+    });
+    const page = await context.newPage();
+    const app = new LaddersApp(page);
+    await use({
+      page,
+      app,
+      open: async (path: string) => {
         const target = new URL(path, projectConfigs.ladders.localhost).href;
         if (page.url() === target) await page.reload();
         else await page.goto(path);
