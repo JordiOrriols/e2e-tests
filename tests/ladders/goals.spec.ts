@@ -109,7 +109,7 @@ test.describe("Ladders goals @goals", () => {
     await expect(app.goalByTitle(original)).toHaveCount(0);
   });
 
-  test("adds and deletes a comment on a goal", async ({ page, data }) => {
+  test("adds a comment on a goal and keeps it after a reload", async ({ page, data }) => {
     const app = new LaddersApp(page);
     const memberName = uniqueName("E2E Comment");
     const title = uniqueName("E2E Discussed");
