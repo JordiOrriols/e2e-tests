@@ -31,8 +31,13 @@ export function readAppEnv(): AppEnv {
 
 export type Session = { url: string; key: string; token: string };
 
-/** Builds a client from the app env plus the signed-in session. */
-export function session(): Session {
+/**
+ * Builds a client from the app env plus a signed-in session.
+ *
+ * The state path is a parameter so the same client can act as either test user,
+ * which is what proves the row level security rather than just the UI.
+ */
+export function session(statePath: string = STATE_PATH): Session {
   const env = readAppEnv();
   const url = env.VITE_SUPABASE_URL;
   const key = env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -41,13 +46,13 @@ export function session(): Session {
       "ladders/.env is missing the Supabase URL or publishable key",
     );
 
-  const state = JSON.parse(readFileSync(STATE_PATH, "utf8")) as {
+  const state = JSON.parse(readFileSync(statePath, "utf8")) as {
     origins?: { localStorage?: { name: string; value: string }[] }[];
   };
   const raw = state.origins?.[0]?.localStorage?.find((entry) =>
     entry.name.startsWith("sb-"),
   )?.value;
-  if (!raw) throw new Error(`No Supabase session found in ${STATE_PATH}`);
+  if (!raw) throw new Error(`No Supabase session found in ${statePath}`);
 
   const token = (JSON.parse(raw) as { access_token?: string }).access_token;
   if (!token)
@@ -104,8 +109,8 @@ export class LaddersData {
   private readonly createdMembers = new Set<string>();
   private readonly createdTeams = new Set<string>();
 
-  constructor() {
-    const s = session();
+  constructor(statePath?: string) {
+    const s = session(statePath);
     this.url = s.url;
     this.key = s.key;
     this.token = s.token;
