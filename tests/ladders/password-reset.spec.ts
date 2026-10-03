@@ -1,58 +1,76 @@
 import { expect, test } from "./fixtures";
 import { LaddersApp } from "./ladders-app";
 
-/**
- * Requesting a password reset via email.
- */
-
 test.describe("Ladders password reset @password-reset", () => {
-  test("a user can request a password reset with valid email", async ({
-    page,
-  }) => {
-    const app = new LaddersApp(page);
-    await app.gotoHome();
+  test.use({ storageState: { cookies: [], origins: [] } });
 
-    // Go to login dialog
-    await expect(page.getByTestId("sign-in-button")).toBeVisible();
-    await page.getByTestId("sign-in-button").click();
-
-    // Click forgot password
-    await page.getByText("Forgot password?").click();
-
-    // Enter a valid email address and request reset
-    const emailInput = page.locator("#email");
-    await expect(emailInput).toBeVisible();
-    await emailInput.fill("test@example.com");
-
-    // Click send reset email
-    const resetButton = page.getByRole("button", { name: "Send reset email" });
-    await expect(resetButton).toBeVisible();
-    await resetButton.click();
-
-    // Should show success message
-    await expect(page.getByText("Check your email")).toBeVisible();
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/");
+    await new LaddersApp(page).openSignIn();
+    await page.getByRole("button", { name: "Forgot password?" }).click();
+    await expect(page.getByTestId("login-password")).toHaveCount(0);
   });
 
-  test("a user gets error for invalid email format", async ({ page }) => {
-    const app = new LaddersApp(page);
-    await app.gotoHome();
+  test("a valid email delegates recovery and shows confirmation", async ({
+    page,
+  }) => {
+    let requestedEmail: string | undefined;
+    await page.route("**/auth/v1/recover**", async (route) => {
+      requestedEmail = route.request().postDataJSON().email;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "{}",
+      });
+    });
+    await page.getByTestId("login-email").fill("test@example.com");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("login-info")).toContainText(
+      "Check your email",
+    );
+    expect(requestedEmail).toBe("test@example.com");
+  });
 
-    // Go to login dialog
-    await page.getByTestId("sign-in-button").click();
+  test("native email validation prevents a recovery request", async ({
+    page,
+  }) => {
+    let requested = false;
+    await page.route("**/auth/v1/recover**", async (route) => {
+      requested = true;
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: "{}",
+      });
+    });
+    const email = page.getByTestId("login-email");
+    await email.fill("invalid-email");
+    await page.getByTestId("login-submit").click();
+    expect(
+      await email.evaluate(
+        (input: HTMLInputElement) => input.validity.typeMismatch,
+      ),
+    ).toBe(true);
+    expect(requested).toBe(false);
+    await expect(page.getByTestId("login-info")).toHaveCount(0);
+  });
 
-    // Click forgot password
-    await page.getByText("Forgot password?").click();
-
-    // Enter an invalid email and try reset
-    const emailInput = page.locator("#email");
-    await emailInput.fill("invalid-email");
-
-    const resetButton = page.getByRole("button", { name: "Send reset email" });
-    await resetButton.click();
-
-    // Should show error message - likely validation or system error
-    // For simplicity we test that the form tries to process it
-    // Since Supabase handles this in backend, we just expect an error message
-    await expect(page.getByText(/invalid|error/)).toBeVisible();
+  test("recovery failures stay visible and permit a retry", async ({
+    page,
+  }) => {
+    await page.route("**/auth/v1/recover**", (route) =>
+      route.fulfill({
+        status: 429,
+        contentType: "application/json",
+        body: JSON.stringify({ msg: "Email rate limit exceeded" }),
+      }),
+    );
+    await page.getByTestId("login-email").fill("test@example.com");
+    await page.getByTestId("login-submit").click();
+    await expect(page.getByTestId("login-error")).toContainText(
+      "Email rate limit exceeded",
+    );
+    await expect(page.getByTestId("login-submit")).toBeEnabled();
+    await expect(page.getByTestId("login-info")).toHaveCount(0);
   });
 });
