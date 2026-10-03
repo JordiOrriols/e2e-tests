@@ -9,6 +9,7 @@ End-to-end testing repository for jordiorriols projects using Playwright.
 | Website | https://www.jordiorriols.cat | http://localhost:5173 |
 | Airmap | https://airmap.jordiorriols.cat | http://localhost:5174 |
 | Ladders | https://ladders.jordiorriols.cat | http://localhost:5175 |
+| Planner | Not configured | http://127.0.0.1:5176 |
 
 ## Setup
 
@@ -33,7 +34,18 @@ npm test
 npm run test:website
 npm run test:airmap
 npm run test:ladders
+
+# Planner currently has a localhost suite only
+npm run test:planner
 ```
+
+Start Planner's development server first. Its live Supabase tests use
+`LADDERS_TEST_EMAIL`, `LADDERS_TEST_PASSWORD`, `LADDERS_TEST2_EMAIL` and
+`LADDERS_TEST2_PASSWORD` from the environment/keychain. The sibling Planner
+environment supplies the shared Supabase URL and publishable key. Tests cover
+estimate persistence, backlog priorities, concurrent roles, vacation-adjusted
+dates, invitations, availability ownership and intercepted recovery without
+sending email. They create unique workspaces and delete only their own test data.
 
 ### By Environment
 ```bash
@@ -99,7 +111,8 @@ e2e-tests/
 ├── tests/              # Test files
 │   ├── website/
 │   ├── airmap/
-│   └── ladders/
+│   ├── ladders/
+│   └── planner/
 ├── scripts/            # CLI scripts
 │   └── compare-screenshots.ts
 └── playwright.config.ts
@@ -153,6 +166,7 @@ The `playwright.config.ts` defines projects for each app/environment combination
 - `airmap-production`
 - `ladders-localhost`
 - `ladders-production`
+- `planner-localhost`
 - Mobile variants: `*-mobile`
 
 ## Reports
