@@ -41,7 +41,7 @@ const VIEWPORT = { width: 1280, height: 720 };
 async function takeScreenshot(
   page: Page,
   url: string,
-  name: string
+  name: string,
 ): Promise<string> {
   await page.goto(url);
   await page.waitForLoadState("networkidle");
@@ -50,7 +50,7 @@ async function takeScreenshot(
 
   const filename = path.join(SCREENSHOT_DIR, `${name}.png`);
   await page.screenshot({ path: filename, fullPage: true });
-  
+
   return filename;
 }
 
@@ -80,11 +80,13 @@ async function compare(): Promise<void> {
       // Take production screenshot
       let productionFile = "";
       try {
-        console.log(`  → Taking production screenshot: ${project.production}${pagePath}`);
+        console.log(
+          `  → Taking production screenshot: ${project.production}${pagePath}`,
+        );
         productionFile = await takeScreenshot(
           page,
           `${project.production}${pagePath}`,
-          `${baseName}-production`
+          `${baseName}-production`,
         );
         console.log(`    ✓ Saved: ${productionFile}`);
       } catch (error) {
@@ -102,11 +104,13 @@ async function compare(): Promise<void> {
       // Take localhost screenshot
       let localhostFile = "";
       try {
-        console.log(`  → Taking localhost screenshot: ${project.localhost}${pagePath}`);
+        console.log(
+          `  → Taking localhost screenshot: ${project.localhost}${pagePath}`,
+        );
         localhostFile = await takeScreenshot(
           page,
           `${project.localhost}${pagePath}`,
-          `${baseName}-localhost`
+          `${baseName}-localhost`,
         );
         console.log(`    ✓ Saved: ${localhostFile}`);
       } catch (error) {
@@ -146,7 +150,7 @@ async function compare(): Promise<void> {
     }[result.status];
 
     console.log(`${statusIcon} ${result.project} ${result.page}`);
-    
+
     if (result.status === "success") {
       console.log(`   Production: ${result.production}`);
       console.log(`   Localhost:  ${result.localhost}`);
