@@ -59,9 +59,10 @@ test.describe("Ladders Form Snapshots @visual", () => {
     await homePage.goto();
     await waitForPageReady(page);
 
-    // Click add member to navigate to form
+    // Click add member to navigate to form. The team list renders one button per
+    // team, so this asks for a button rather than insisting on a single team.
     await page.getByTestId("tab-team").click();
-    await page.getByTestId("add-member-button").click();
+    await page.getByTestId("add-member-button").first().click();
 
     // Wait for form to load
     const nameInput = page
