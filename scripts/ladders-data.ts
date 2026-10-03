@@ -274,14 +274,14 @@ export class LaddersData {
 
   /**
    * Writes a version directly, which is how a test sets up a state the UI would
-   * need several steps to reach. An empty level map is sent as null, the same
-   * shape the app stores, so reads compare like for like.
+   * need several steps to reach. The level and comment columns are not nullable
+   * and the app stores an empty map rather than null, so that is what goes in.
    */
   async createEvaluation(
     memberId: string,
     input: EvaluationInput,
   ): Promise<EvaluationRow> {
-    const row = await this.request<EvaluationRow>("evaluations", {
+    const rows = await this.request<EvaluationRow[]>("evaluations", {
       method: "POST",
       prefer: "return=representation",
       body: JSON.stringify({
@@ -289,12 +289,16 @@ export class LaddersData {
         kind: input.kind,
         status: input.status ?? "draft",
         author_name: input.authorName ?? null,
-        current_levels: input.currentLevels ?? null,
-        goal_levels: input.goalLevels ?? null,
+        current_levels: input.currentLevels ?? {},
+        goal_levels: input.goalLevels ?? {},
         comments: input.comments ?? {},
         ...(input.createdAt ? { created_at: input.createdAt } : {}),
       }),
     });
+    // An insert that returned nothing would otherwise be tracked as the string
+    // "undefined" and fail again, later, during cleanup.
+    const row = rows[0];
+    if (!row?.id) throw new Error("the evaluation insert returned no row");
     this.createdEvaluations.add(row.id);
     return row;
   }
@@ -319,6 +323,21 @@ export class LaddersData {
     return this.request<GoalRow>("rpc/append_goal_comment", {
       method: "POST",
       body: JSON.stringify({ p_id: goalId, p_text: text }),
+    });
+  }
+
+  /**
+   * Replaces the comment list of a goal outright. A manager is allowed to update
+   * a goal, so this only fails if the comments themselves are protected, which
+   * is the point of asking.
+   */
+  async replaceGoalComments(
+    goalId: string,
+    comments: unknown[],
+  ): Promise<void> {
+    await this.request(`smart_goals?id=eq.${goalId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ comments }),
     });
   }
 
