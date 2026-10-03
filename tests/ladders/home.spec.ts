@@ -1,9 +1,10 @@
-import { test, expect } from "../../fixtures";
+import { test, expect, seedMember } from "./fixtures";
 import {
   LaddersHomePage,
   LaddersMemberDetailsPanel,
 } from "../../pages/ladders";
 import { waitForPageReady } from "../../utils";
+import { uniqueName } from "./ladders-app";
 
 test.describe("Ladders Home Page", () => {
   test("should load successfully", async ({ page }) => {
@@ -32,13 +33,14 @@ test.describe("Ladders Home Page", () => {
     await expect(page.getByTestId("header-subtitle")).toBeVisible();
   });
 
-  test("should have add member button", async ({ page }) => {
+  test("should have add member button", async ({ page, data }) => {
+    await seedMember(data, uniqueName("E2E HomeAdd"));
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
     // The add member action lives in the Team tab, which is not the default one.
     await page.getByTestId("tab-team").click();
-    await expect(page.getByTestId("add-member-button")).toBeVisible();
+    await expect(page.getByTestId("add-member-button").first()).toBeVisible();
   });
 
   test("should have reference button on desktop", async ({ page }) => {
@@ -63,13 +65,14 @@ test.describe("Ladders Home Page", () => {
 });
 
 test.describe("Ladders Add Member", () => {
-  test("should open add member form", async ({ page }) => {
+  test("should open add member form", async ({ page, data }) => {
+    await seedMember(data, uniqueName("E2E HomeForm"));
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
     // Click add member button
     await page.getByTestId("tab-team").click();
-    await page.getByTestId("add-member-button").click();
+    await page.getByTestId("add-member-button").first().click();
 
     // It navigates to a form page (not a modal) - wait for form elements
     const nameInput = page
@@ -99,12 +102,13 @@ test.describe("Ladders Add Member", () => {
     await page.waitForTimeout(300);
   });
 
-  test("should navigate back from add member form", async ({ page }) => {
+  test("should navigate back from add member form", async ({ page, data }) => {
+    await seedMember(data, uniqueName("E2E HomeBack"));
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
     await page.getByTestId("tab-team").click();
-    await page.getByTestId("add-member-button").click();
+    await page.getByTestId("add-member-button").first().click();
 
     // Wait for form
     const nameInput = page
@@ -236,7 +240,8 @@ test.describe("Ladders Tab Navigation", () => {
 });
 
 test.describe("Ladders Responsiveness", () => {
-  test("should work on mobile viewport", async ({ page }) => {
+  test("should work on mobile viewport", async ({ page, data }) => {
+    await seedMember(data, uniqueName("E2E HomeMobile"));
     await page.setViewportSize({ width: 375, height: 667 });
 
     const homePage = new LaddersHomePage(page);
@@ -245,7 +250,7 @@ test.describe("Ladders Responsiveness", () => {
     await expect(page.getByTestId("header")).toBeVisible();
 
     await page.getByTestId("tab-team").click();
-    await expect(page.getByTestId("add-member-button")).toBeVisible();
+    await expect(page.getByTestId("add-member-button").first()).toBeVisible();
   });
 
   test("should work on tablet viewport", async ({ page }) => {
