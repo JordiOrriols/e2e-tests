@@ -102,6 +102,12 @@ export type GoalRow = {
   comments: unknown[];
 };
 
+/** Short, quotable form of an error for failure messages. */
+function describe(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.replace(/\s+/g, " ").slice(0, 160);
+}
+
 export class LaddersData {
   private readonly url: string;
   private readonly key: string;
@@ -142,6 +148,24 @@ export class LaddersData {
 
   listMembers(): Promise<MemberRow[]> {
     return this.request<MemberRow[]>("members?select=*&order=created_at.desc");
+  }
+
+  async member(id: string): Promise<MemberRow | undefined> {
+    const rows = await this.request<MemberRow[]>(
+      `members?id=eq.${id}&select=*`,
+    );
+    return rows[0];
+  }
+
+  /** Updates a member. Throws when row level security refuses the caller. */
+  async patchMember(
+    id: string,
+    changes: Partial<Pick<MemberRow, "name" | "role">>,
+  ): Promise<void> {
+    await this.request(`members?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(changes),
+    });
   }
 
   listTeams(): Promise<TeamRow[]> {
@@ -266,20 +290,41 @@ export class LaddersData {
     return team;
   }
 
-  async cleanup(): Promise<{ members: number; teams: number }> {
+  async cleanup(): Promise<{
+    members: number;
+    teams: number;
+    failures: string[];
+  }> {
+    // Every row is attempted even after one fails. Aborting on the first error
+    // used to leave every remaining row behind and report the run as clean,
+    // which then showed up much later as a confusing unrelated failure.
+    const failures: string[] = [];
     let members = 0;
     for (const id of this.createdMembers) {
-      await this.deleteMember(id);
-      members += 1;
+      try {
+        await this.deleteMember(id);
+        members += 1;
+      } catch (error) {
+        failures.push(`member ${id}: ${describe(error)}`);
+      }
     }
     let teams = 0;
     for (const id of this.createdTeams) {
-      await this.deleteTeam(id);
-      teams += 1;
+      try {
+        await this.deleteTeam(id);
+        teams += 1;
+      } catch (error) {
+        failures.push(`team ${id}: ${describe(error)}`);
+      }
     }
     this.createdMembers.clear();
     this.createdTeams.clear();
-    return { members, teams };
+    if (failures.length > 0) {
+      throw new Error(
+        `cleanup left ${failures.length} row(s) behind:\n  ${failures.join("\n  ")}`,
+      );
+    }
+    return { members, teams, failures };
   }
 
   /** Bulk sweep by name, for manual recovery via scripts/cleanup-ladders-data.ts. */

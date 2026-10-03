@@ -64,7 +64,9 @@ export const test = base.extend<{
   data: async ({}, use) => {
     const data = new LaddersData();
     await use(data);
-    await data.cleanup().catch(() => undefined);
+    // Left over rows break the next run in a way that looks unrelated, and the
+    // cleanup error says exactly which row and why, so let it fail the test.
+    await data.cleanup();
   },
 
   defaultTeamName: async ({ data }, use) => {
