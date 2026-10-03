@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Page, Locator } from "@playwright/test";
 import { expect } from "@playwright/test";
 import { DATA_TIMEOUT } from "./fixtures";
@@ -12,11 +13,18 @@ import { DATA_TIMEOUT } from "./fixtures";
 
 let counter = 0;
 
-/** Unique, readable name so repeated runs never collide. */
+/**
+ * Unique, readable name so repeated runs never collide.
+ *
+ * The random part matters as much as the timestamp: workers are separate
+ * processes that start their tests in the same millisecond, and a name plus a
+ * per process counter collides exactly then.
+ */
 export function uniqueName(prefix: string): string {
   counter += 1;
-  const stamp = Date.now().toString(36).slice(-6);
-  return `${prefix} ${stamp}-${counter}`;
+  const stamp = Date.now().toString(36).slice(-4);
+  const unique = randomUUID().slice(0, 4);
+  return `${prefix} ${stamp}${unique}-${counter}`;
 }
 
 /** The app uses a HashRouter, so routes live under `#/`. */
@@ -350,6 +358,55 @@ export class LaddersApp {
     return this.page.locator(
       '[data-testid^="assessment-action-"][data-testid$="_publish"]',
     );
+  }
+
+  /* Team sharing */
+
+  get shareDialog(): Locator {
+    return this.page.getByTestId("share-team-dialog");
+  }
+
+  get shareError(): Locator {
+    return this.page.getByTestId("share-error");
+  }
+
+  async openShareDialog(teamName: string): Promise<void> {
+    await this.page.getByTestId("tab-team").click();
+    await this.teamSectionByName(teamName)
+      .getByTestId("team-share-open")
+      .click();
+    await expect(this.shareDialog).toBeVisible();
+  }
+
+  async share(email: string, access: "viewer" | "editor"): Promise<void> {
+    await this.page.getByTestId("share-email-input").fill(email);
+    await this.page.getByTestId("share-access-select").selectOption(access);
+    await this.page.getByTestId("share-team-submit").click();
+  }
+
+  shareRow(email: string): Locator {
+    return this.page
+      .locator('[data-testid="share-row"]')
+      .filter({ hasText: email });
+  }
+
+  async waitForShareRow(email: string): Promise<Locator> {
+    const row = this.shareRow(email);
+    await expect(row).toBeVisible({ timeout: DATA_TIMEOUT });
+    return row;
+  }
+
+  async changeShareAccess(
+    email: string,
+    access: "viewer" | "editor",
+  ): Promise<void> {
+    await this.shareRow(email)
+      .getByTestId("share-row-access")
+      .selectOption(access);
+  }
+
+  async removeShare(email: string): Promise<void> {
+    await this.shareRow(email).getByTestId("share-row-remove").click();
   }
 
   /* Authentication */
