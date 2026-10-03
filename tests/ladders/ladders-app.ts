@@ -46,6 +46,11 @@ export class LaddersApp {
     await expect(this.page.getByTestId("main-tabs")).toBeVisible();
   }
 
+  /** Opens a hash route directly, for the screens that live outside the tabs. */
+  async goto(path: string): Promise<void> {
+    await this.page.goto(path);
+  }
+
   get teamTab(): Locator {
     return this.page.getByTestId("tab-team");
   }
@@ -351,6 +356,22 @@ export class LaddersApp {
     await this.openMember(oldName);
     await this.page.getByTestId("assessment-name").fill(newName);
     await this.waitForAutosave();
+  }
+
+  /** One entry per version the current screen is allowed to show. */
+  async listedVersions(): Promise<{ author: string; status: string }[]> {
+    const rows = this.page.getByTestId("version-row");
+    const listed: { author: string; status: string }[] = [];
+    for (const row of await rows.all()) {
+      listed.push({
+        author: (await row.getByTestId("version-author").innerText()).trim(),
+        status:
+          (await row
+            .getByTestId("version-status")
+            .getAttribute("data-status")) ?? "",
+      });
+    }
+    return listed;
   }
 
   /** Publish button is present on both self and peer flows, with a mode prefix. */
