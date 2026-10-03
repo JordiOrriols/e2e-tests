@@ -17,7 +17,19 @@
     "test:visual:update": "playwright test --grep @visual --update-snapshots",
     "compare": "tsx scripts/compare-screenshots.ts",
     "report": "playwright show-report",
-    "codegen": "playwright codegen"
+    "codegen": "playwright codegen",
+    "ladders": "playwright test --project=ladders-localhost",
+    "ladders:smoke": "playwright test --project=ladders-localhost --grep @smoke",
+    "ladders:auth": "playwright test --project=ladders-localhost --grep @auth",
+    "ladders:teams": "playwright test --project=ladders-localhost --grep @teams",
+    "ladders:members": "playwright test --project=ladders-localhost --grep @members",
+    "ladders:goals": "playwright test --project=ladders-localhost --grep @goals",
+    "ladders:evaluations": "playwright test --project=ladders-localhost --grep @evaluations",
+    "ladders:sharing": "playwright test --project=ladders-localhost --grep @sharing",
+    "ladders:reference": "playwright test --project=ladders-localhost --grep @reference",
+    "ladders:responsive": "playwright test --project=ladders-localhost --grep @responsive",
+    "ladders:visual": "playwright test --project=ladders-localhost --grep @visual",
+    "ladders:visual:update": "playwright test --project=ladders-localhost --grep @visual --update-snapshots"
   },
   "devDependencies": {
     "@playwright/test": "^1.48.0",
