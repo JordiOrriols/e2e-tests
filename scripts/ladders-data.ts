@@ -70,6 +70,7 @@ export type MemberRow = {
   peer_token: string;
   view_token: string;
   view_enabled: boolean;
+  template_id: string | null;
 };
 
 export type TeamRow = { id: string; name: string; is_default: boolean };
@@ -353,6 +354,17 @@ export class LaddersData {
     return this.request<GoalRow>("rpc/append_goal_comment", {
       method: "POST",
       body: JSON.stringify({ p_id: goalId, p_text: text }),
+    });
+  }
+
+  /** Puts the member on a seniority template, or takes it off them with null. */
+  async setTemplate(
+    memberId: string,
+    templateId: string | null,
+  ): Promise<void> {
+    await this.request(`members?id=eq.${memberId}`, {
+      method: "PATCH",
+      body: JSON.stringify({ template_id: templateId }),
     });
   }
 
