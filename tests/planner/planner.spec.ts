@@ -33,7 +33,10 @@ async function api<T>(account: Account, path: string, init: RequestInit = {}): P
 }
 async function authenticatedPage(browser: Browser, account: Account): Promise<{ page: Page; context: BrowserContext }> {
   const context = await browser.newContext();
-  await context.addInitScript(({ storageKey, session }) => localStorage.setItem(storageKey, JSON.stringify(session)), {
+  await context.addInitScript(({ storageKey, session }) => {
+    localStorage.setItem(storageKey, JSON.stringify(session));
+    localStorage.setItem("i18nextLng", "en");
+  }, {
     storageKey: `sb-${new URL(url!).hostname.split(".")[0]}-auth-token`, session: account,
   });
   const page = await context.newPage();
@@ -46,6 +49,12 @@ test("estimates, priority scheduling, invitations and vacation ownership persist
   const owner = await signIn();
   const collaborator = await signIn(true);
   const { page, context } = await authenticatedPage(browser, owner);
+  const runtimeErrors: string[] = [];
+  page.on("pageerror", error => runtimeErrors.push(error.message));
+  page.on("console", message => {
+    if (message.type() === "error" && message.text().includes("cannot be given refs"))
+      runtimeErrors.push(message.text());
+  });
   const workspaceName = `Planner E2E ${randomUUID().slice(0, 8)}`;
   let workspaceId: string | undefined;
   let secondContext: BrowserContext | undefined;
@@ -60,17 +69,66 @@ test("estimates, priority scheduling, invitations and vacation ownership persist
     workspaceId = workspaces?.[0]?.id;
     if (!workspaceId) throw new Error("Test workspace was not persisted");
 
+    await expect(api(owner, "planner_projects", {
+      method: "POST",
+      body: JSON.stringify({
+        workspace_id: workspaceId, name: "Rejected fractional estimate",
+        backend_devs: 1, backend_weeks: 1.5,
+      }),
+    })).rejects.toThrow(/planner_projects_whole_estimates/);
+
+    await expect(page.getByTestId("header-title")).toHaveText("Cadence");
+    await expect(page.getByTestId("header-title")).toHaveCSS("font-size", "18px");
+    await expect(page.getByTestId("header-subtitle")).toHaveCSS("font-size", "12px");
+    await expect(page.getByTestId("header-content").locator("svg")).toHaveCSS("width", "20px");
+    await page.getByRole("button", { name: "Language", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: "Español" }).click();
+    await expect(page.getByRole("link", { name: "Plan del backlog" })).toBeVisible();
+    await expect(page.getByTestId("sign-out-button")).toHaveAccessibleName("Cerrar sesión");
+    await page.getByTestId("language-selector").click();
+    await page.getByRole("menuitemradio", { name: "English" }).click();
+    await page.setViewportSize({ width: 375, height: 812 });
+    await expect(page.getByTestId("language-selector")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+    const brand = await page.getByTestId("header-content").boundingBox();
+    const tabs = await page.getByRole("navigation", { name: "Planner pages" }).boundingBox();
+    expect(brand).not.toBeNull();
+    expect(tabs).not.toBeNull();
+    expect(tabs!.y).toBeGreaterThanOrEqual(brand!.y + brand!.height);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
+    await page.setViewportSize({ width: 1280, height: 900 });
     await page.getByRole("button", { name: "New microproject" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Checkout");
+    for (const role of ["Backend", "Frontend", "Design", "QA"]) {
+      for (const field of ["people", "weeks"]) {
+        const input = page.getByLabel(`${role} ${field}`, { exact: true });
+        await expect(input).toHaveAttribute("step", "1");
+        await input.fill("1.5");
+        expect(await input.evaluate(element => (element as HTMLInputElement).validity.stepMismatch)).toBe(true);
+        await input.fill("0");
+      }
+    }
     await page.getByLabel("Backend people").fill("1");
     await page.getByLabel("Backend weeks").fill("1");
     await page.getByRole("button", { name: "Create microproject" }).click();
     await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Add to backlog: Checkout", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Remove from backlog: Checkout" })).toBeVisible();
+    await page.getByRole("link", { name: "Backlog Plan", exact: true }).click();
+    await page.getByRole("button", { name: "Add projects", exact: true }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: "Add to backlog: Checkout", exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText("All estimates are already in the backlog.");
+    await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByRole("button", { name: "Remove from backlog: Checkout", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "No projects in the backlog" })).toBeVisible();
+    await page.getByRole("button", { name: "Add projects", exact: true }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: "Add to backlog: Checkout", exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText("All estimates are already in the backlog.");
+    await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
     await page.reload();
-    await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Backlog Plan" }).click();
+    await page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId);
+    await expect.poll(async () => ({
+      errors: runtimeErrors,
+      selectedProjectVisible: await page.getByRole("button", { name: "Remove from backlog: Checkout", exact: true }).isVisible(),
+    })).toEqual({ errors: [], selectedProjectVisible: true });
     await page.getByLabel("Plan starts").fill("2026-10-05");
     await expect(page.getByLabel("Project schedule")).toContainText("Oct 9, 2026");
 
@@ -122,6 +180,7 @@ test("estimates, priority scheduling, invitations and vacation ownership persist
     await page.getByRole("button", { name: "Delete Checkout" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Delete", exact: true }).click();
     await expect(page.getByRole("heading", { name: "No microprojects yet" })).toBeVisible();
+    expect(runtimeErrors).toEqual([]);
   } finally {
     if (!workspaceId) {
       const rows = await api<{ id: string }[]>(owner, `planner_workspaces?name=eq.${encodeURIComponent(workspaceName)}&select=id`);
@@ -169,6 +228,7 @@ test("backlog priorities can be reordered and different roles run in parallel", 
     await expect(page.getByLabel("Second: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
     await expect(page.getByLabel("First: Oct 13, 2026 to Oct 19, 2026", { exact: true })).toBeVisible();
     await page.reload();
+    await page.getByLabel("Workspace", { exact: true }).selectOption(workspace.id);
     await page.getByLabel("Plan starts").fill("2026-10-05");
     await expect(page.getByLabel("Second: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Vacations", exact: true }).click();
