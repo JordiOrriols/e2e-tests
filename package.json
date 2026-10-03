@@ -28,6 +28,7 @@
     "ladders:sharing": "playwright test --project=ladders-localhost --grep @sharing",
     "ladders:visibility": "playwright test --project=ladders-localhost --grep @visibility",
     "ladders:templates": "playwright test --project=ladders-localhost --grep @templates",
+    "ladders:versions": "playwright test --project=ladders-localhost --grep @versions",
     "ladders:peers": "playwright test --project=ladders-localhost --grep @peers",
     "ladders:reference": "playwright test --project=ladders-localhost --grep @reference",
     "ladders:responsive": "playwright test --project=ladders-localhost --grep @responsive",
