@@ -39,13 +39,20 @@ npm run test:ladders
 npm run test:planner
 ```
 
+For an isolated Ladders server on a different port, set `LADDERS_LOCAL_URL`
+before running tests, for example `LADDERS_LOCAL_URL=http://127.0.0.1:5185`.
+The auth setup and collaboration contexts use this same URL.
+
 Start Planner's development server first. Its live Supabase tests use
 `LADDERS_TEST_EMAIL`, `LADDERS_TEST_PASSWORD`, `LADDERS_TEST2_EMAIL` and
 `LADDERS_TEST2_PASSWORD` from the environment/keychain. The sibling Planner
 environment supplies the shared Supabase URL and publishable key. Tests cover
 estimate persistence, backlog priorities, concurrent roles, vacation-adjusted
 dates, invitations, availability ownership and intercepted recovery without
-sending email. They create unique workspaces and delete only their own test data.
+sending email. Planner also verifies integer-only estimates at the browser and
+live database boundaries, direct backlog add/remove, localized shared header
+controls, typography/icon sizes and mobile navigation. They create unique
+workspaces and delete only their own test data.
 
 ### By Environment
 ```bash

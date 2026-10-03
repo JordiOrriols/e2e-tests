@@ -14,7 +14,7 @@ const projectConfigs = {
     production: "https://airmap.jordiorriols.cat",
   },
   ladders: {
-    localhost: "http://localhost:5175",
+    localhost: process.env.LADDERS_LOCAL_URL ?? "http://localhost:5175",
     production: "https://ladders.jordiorriols.cat",
   },
 } as const;
