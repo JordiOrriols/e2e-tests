@@ -271,14 +271,22 @@ test.describe("Ladders shared team as a collaborator", () => {
     await app.setLevel("Technology", 2);
     await app.publishMember();
 
+    let created: { id: string; team_id: string | null } | undefined;
     await expect
       .poll(
-        async () =>
-          (await data.listMembers()).find((m) => m.name === memberName)
-            ?.team_id,
+        async () => {
+          created = (await data.listMembers()).find(
+            (m) => m.name === memberName,
+          );
+          return created?.team_id;
+        },
         { timeout: SHARE_TIMEOUT },
       )
       .toBe(team.id);
+    // The member was created through the UI by the other user, so cleanup has to
+    // be told about it: an empty team can be deleted, a team with a leftover
+    // member cannot, and the failure would be reported as the team, not the cause.
+    data.trackMember(created!);
   });
 
   test("removing the share takes the team away", async ({
