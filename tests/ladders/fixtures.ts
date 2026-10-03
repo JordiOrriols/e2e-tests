@@ -59,6 +59,7 @@ export const test = base.extend<{
   defaultTeamName: string;
   shared: SharedSession;
   collaborator: CollaboratorSession;
+  collaboratorData: LaddersData;
 }>({
   data: async ({}, use) => {
     const data = new LaddersData();
@@ -110,6 +111,11 @@ export const test = base.extend<{
       },
     });
     await context.close();
+  },
+
+  /** Data client bound to the collaborator's session. */
+  collaboratorData: async ({}, use) => {
+    await use(new LaddersData(SECOND_STATE_PATH));
   },
 });
 
