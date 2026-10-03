@@ -27,6 +27,7 @@
     "ladders:evaluations": "playwright test --project=ladders-localhost --grep @evaluations",
     "ladders:sharing": "playwright test --project=ladders-localhost --grep @sharing",
     "ladders:visibility": "playwright test --project=ladders-localhost --grep @visibility",
+    "ladders:peers": "playwright test --project=ladders-localhost --grep @peers",
     "ladders:reference": "playwright test --project=ladders-localhost --grep @reference",
     "ladders:responsive": "playwright test --project=ladders-localhost --grep @responsive",
     "ladders:visual": "playwright test --project=ladders-localhost --grep @visual",
