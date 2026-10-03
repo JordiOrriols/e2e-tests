@@ -1,5 +1,8 @@
 import { test, expect } from "../../fixtures";
-import { LaddersHomePage, LaddersMemberDetailsPanel } from "../../pages/ladders";
+import {
+  LaddersHomePage,
+  LaddersMemberDetailsPanel,
+} from "../../pages/ladders";
 import { waitForPageReady } from "../../utils";
 
 test.describe("Ladders Home Page", () => {
@@ -33,7 +36,8 @@ test.describe("Ladders Home Page", () => {
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
-    // Check add member button
+    // The add member action lives in the Team tab, which is not the default one.
+    await page.getByTestId("tab-team").click();
     await expect(page.getByTestId("add-member-button")).toBeVisible();
   });
 
@@ -64,11 +68,14 @@ test.describe("Ladders Add Member", () => {
     await homePage.goto();
 
     // Click add member button
+    await page.getByTestId("tab-team").click();
     await page.getByTestId("add-member-button").click();
-    
+
     // It navigates to a form page (not a modal) - wait for form elements
-    const nameInput = page.locator('input[placeholder*="name"], [aria-label*="Name"]').first();
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    const nameInput = page
+      .locator('input[placeholder*="name"], [aria-label*="Name"]')
+      .first();
+    await expect(nameInput).toBeVisible();
   });
 
   test("should open reference view", async ({ page }) => {
@@ -76,13 +83,17 @@ test.describe("Ladders Add Member", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
 
-    // Click reference button  
+    // Click reference button
     await page.getByTestId("reference-button").click();
-    
+
     // Check for reference content (could be modal or navigation)
-    const referenceContent = page.locator('[role="dialog"], [class*="reference"], h2:has-text("Reference"), h2:has-text("Level")').first();
-    await expect(referenceContent).toBeVisible({ timeout: 5000 });
-    
+    const referenceContent = page
+      .locator(
+        '[role="dialog"], [class*="reference"], h2:has-text("Reference"), h2:has-text("Level")',
+      )
+      .first();
+    await expect(referenceContent).toBeVisible();
+
     // Try to go back or close
     await page.keyboard.press("Escape");
     await page.waitForTimeout(300);
@@ -92,14 +103,21 @@ test.describe("Ladders Add Member", () => {
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
+    await page.getByTestId("tab-team").click();
     await page.getByTestId("add-member-button").click();
-    
+
     // Wait for form
-    const nameInput = page.locator('input[placeholder*="name"], [aria-label*="Name"]').first();
-    await expect(nameInput).toBeVisible({ timeout: 5000 });
+    const nameInput = page
+      .locator('input[placeholder*="name"], [aria-label*="Name"]')
+      .first();
+    await expect(nameInput).toBeVisible();
 
     // Go back
-    const backButton = page.locator('button:has-text("back"), button:has-text("Back"), a:has-text("back")').first();
+    const backButton = page
+      .locator(
+        'button:has-text("back"), button:has-text("Back"), a:has-text("back")',
+      )
+      .first();
     if (await backButton.isVisible()) {
       await backButton.click();
       await page.waitForTimeout(500);
@@ -127,6 +145,9 @@ test.describe("Ladders Language", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
 
+    // The selector is a dropdown, so the options only exist once it is open.
+    await page.getByTestId("language-selector").click();
+
     await expect(page.getByTestId("language-button-en")).toBeVisible();
     await expect(page.getByTestId("language-button-es")).toBeVisible();
     await expect(page.getByTestId("language-button-ca")).toBeVisible();
@@ -137,16 +158,24 @@ test.describe("Ladders Language", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
 
-    await page.getByTestId("language-button-es").click();
-    await page.waitForTimeout(500);
+    const openMenu = () => page.getByTestId("language-selector").click();
+    const pick = (code: string) =>
+      page.getByTestId(`language-button-${code}`).click();
 
-    await page.getByTestId("language-button-ca").click();
+    await openMenu();
+    await pick("es");
     await page.waitForTimeout(500);
+    await expect(page.getByTestId("language-selector")).toContainText("ES");
 
-    await page.getByTestId("language-button-en").click();
+    await openMenu();
+    await pick("ca");
     await page.waitForTimeout(500);
+    await expect(page.getByTestId("language-selector")).toContainText("CA");
 
-    expect(true).toBe(true);
+    await openMenu();
+    await pick("en");
+    await page.waitForTimeout(500);
+    await expect(page.getByTestId("language-selector")).toContainText("EN");
   });
 });
 
@@ -156,7 +185,11 @@ test.describe("Ladders Member Cards", () => {
     await homePage.goto();
 
     // Team grid or team content area - use flexible selector
-    const teamContent = page.getByTestId("team-grid").or(page.getByTestId("team-tab")).or(page.locator('[class*="team"], [class*="grid"]')).first();
+    const teamContent = page
+      .getByTestId("team-grid")
+      .or(page.getByTestId("team-tab"))
+      .or(page.locator('[class*="team"], [class*="grid"]'))
+      .first();
     await expect(teamContent).toBeVisible();
   });
 
@@ -167,7 +200,7 @@ test.describe("Ladders Member Cards", () => {
     // Member cards use dynamic data-testid
     const memberCards = page.locator('[data-testid^="member-card-"]');
     const count = await memberCards.count();
-    
+
     console.log(`Found ${count} member cards`);
   });
 
@@ -177,7 +210,7 @@ test.describe("Ladders Member Cards", () => {
 
     const memberCards = page.locator('[data-testid^="member-card-"]');
     const count = await memberCards.count();
-    
+
     if (count > 0) {
       await memberCards.first().click();
       await page.waitForTimeout(500);
@@ -205,17 +238,19 @@ test.describe("Ladders Tab Navigation", () => {
 test.describe("Ladders Responsiveness", () => {
   test("should work on mobile viewport", async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 667 });
-    
+
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
     await expect(page.getByTestId("header")).toBeVisible();
+
+    await page.getByTestId("tab-team").click();
     await expect(page.getByTestId("add-member-button")).toBeVisible();
   });
 
   test("should work on tablet viewport", async ({ page }) => {
     await page.setViewportSize({ width: 768, height: 1024 });
-    
+
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
@@ -224,7 +259,7 @@ test.describe("Ladders Responsiveness", () => {
 
   test("should work on desktop viewport", async ({ page }) => {
     await page.setViewportSize({ width: 1280, height: 720 });
-    
+
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
 
