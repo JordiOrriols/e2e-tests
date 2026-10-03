@@ -297,3 +297,98 @@ test("anonymous shared login exposes recovery and delegates it without sending r
   await expect(page.getByTestId("login-info")).toBeVisible();
   expect(recoveries).toBe(1);
 });
+
+test("Ladders shares a personal vacation link and its leave updates two multi-team plans", async ({ browser }) => {
+  test.setTimeout(90_000);
+  const owner = await signIn();
+  const suffix = randomUUID().slice(0, 8);
+  const roster = await createRoster(owner, `Shared roster ${suffix}`);
+  const workspaces: string[] = [];
+  let extraTeam: string | undefined;
+  let context: BrowserContext | undefined;
+  let anonymous: BrowserContext | undefined;
+  try {
+    const extra = await api<{ id: string }>(owner, "rpc/create_team", {
+      method: "POST", body: JSON.stringify({ p_name: `Design roster ${suffix}` }),
+    });
+    if (!extra) throw new Error("Second team creation returned no row");
+    extraTeam = extra.id;
+    await api(owner, "members", {
+      method: "POST", body: JSON.stringify({ team_id: extra.id, name: "Grace", planning_role: "design" }),
+    });
+    for (const name of ["First plan", "Second plan"]) {
+      const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
+        method: "POST", body: JSON.stringify({ workspace_name: `${name} ${suffix}` }),
+      });
+      if (!workspace) throw new Error("Shared plan creation returned no row");
+      workspaces.push(workspace.id);
+      await api(owner, "planner_projects", {
+        method: "POST", body: JSON.stringify({
+          workspace_id: workspace.id, name: "Shared checkout", in_backlog: true,
+          backend_devs: 1, backend_weeks: 1,
+        }),
+      });
+    }
+    const opened = await authenticatedPage(browser, owner);
+    context = opened.context;
+    const page = opened.page;
+    await page.getByLabel("Workspace", { exact: true }).selectOption(workspaces[0]!);
+    await page.getByRole("link", { name: "Vacations", exact: true }).click();
+    await page.getByRole("checkbox", { name: `Shared roster ${suffix}`, exact: true }).check();
+    await page.getByRole("checkbox", { name: `Design roster ${suffix}`, exact: true }).check();
+    await page.getByRole("button", { name: "Save linked teams", exact: true }).click();
+    await expect(page.getByLabel("Planning role for Grace", { exact: true })).toHaveValue("design");
+    await api(owner, "rpc/planner_set_workspace_teams", {
+      method: "POST", body: JSON.stringify({ workspace: workspaces[1], team_ids: [roster.team.id, extra.id] }),
+    });
+
+    const laddersPage = await context.newPage();
+    const laddersURL = new URL(process.env.LADDERS_LOCAL_URL ?? "http://localhost:5175");
+    await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: laddersURL.origin });
+    laddersURL.hash = `/member/${roster.ownerMember.id}`;
+    await laddersPage.goto(laddersURL.toString());
+    await expect(laddersPage.getByTestId("assessment-planning-role")).toHaveValue("backend");
+    await expect(laddersPage.getByTestId("assessment-role")).toHaveValue("Senior Engineer");
+    await laddersPage.getByTestId("assessment-planning-role").selectOption("qa");
+    await expect.poll(async () => {
+      const members = await api<{ planning_role: string; role: string }[]>(owner, `members?id=eq.${roster.ownerMember.id}&select=planning_role,role`);
+      return members?.[0];
+    }).toEqual({ planning_role: "qa", role: "Senior Engineer" });
+    await laddersPage.getByTestId("assessment-planning-role").selectOption("backend");
+    await expect.poll(async () => {
+      const members = await api<{ planning_role: string }[]>(owner, `members?id=eq.${roster.ownerMember.id}&select=planning_role`);
+      return members?.[0]?.planning_role;
+    }).toBe("backend");
+    await laddersPage.getByTestId("split-menu-member_share_self").click();
+    laddersPage.once("dialog", dialog => dialog.dismiss());
+    await laddersPage.getByTestId("split-item-member_share_vacations").click();
+    const vacationURL = await laddersPage.evaluate(() => navigator.clipboard.readText());
+    expect(new URL(vacationURL).hash).toBe(`#/vacations/${roster.ownerMember.vacation_token}`);
+    expect(new URL(vacationURL).origin).toBe("http://127.0.0.1:5176");
+
+    anonymous = await browser.newContext({ viewport: { width: 375, height: 812 } });
+    const vacationPage = await anonymous.newPage();
+    await vacationPage.goto(vacationURL);
+    await expect(vacationPage.getByRole("heading", { name: "Owner", exact: true })).toBeVisible();
+    await vacationPage.getByLabel("From", { exact: true }).fill("2026-10-05");
+    await vacationPage.getByLabel("To", { exact: true }).fill("2026-10-06");
+    await vacationPage.getByRole("button", { name: "Save availability" }).click();
+    await expect(vacationPage.getByText("2026-10-05: Not working", { exact: true })).toBeVisible();
+    expect(await vacationPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
+    await page.reload();
+    for (const workspace of workspaces) {
+      await page.getByLabel("Workspace", { exact: true }).selectOption(workspace);
+      await page.getByRole("link", { name: "Backlog Plan", exact: true }).click();
+      await page.getByLabel("Plan starts").fill("2026-10-05");
+      await expect(page.getByLabel("Shared checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
+    }
+    const availability = await api<{ member_id: string; date: string }[]>(owner, `planner_team_availability?member_id=eq.${roster.ownerMember.id}&select=member_id,date`);
+    expect(availability).toHaveLength(2);
+  } finally {
+    for (const workspace of workspaces) await api(owner, `planner_workspaces?id=eq.${workspace}`, { method: "DELETE" });
+    if (extraTeam) await removeRoster(owner, extraTeam);
+    await removeRoster(owner, roster.team.id);
+    await anonymous?.close();
+    await context?.close();
+  }
+});

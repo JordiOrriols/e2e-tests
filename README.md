@@ -48,11 +48,14 @@ Start Planner's development server first. Its live Supabase tests use
 `LADDERS_TEST2_PASSWORD` from the environment/keychain. The sibling Planner
 environment supplies the shared Supabase URL and publishable key. Tests cover
 estimate persistence, backlog priorities, concurrent roles, vacation-adjusted
-dates, invitations, availability ownership and intercepted recovery without
+dates, linked Ladders teams, anonymous member vacation links, viewer permissions
+and intercepted recovery without
 sending email. Planner also verifies integer-only estimates at the browser and
 live database boundaries, direct backlog add/remove, localized shared header
 controls, typography/icon sizes and mobile navigation. They create unique
-workspaces and delete only their own test data.
+workspaces and Ladders teams/members, and delete only their own test data.
+Apply Planner's shared-team/vacation migration to the shared Supabase project
+before running the updated tests; both apps must use the same project.
 
 ### By Environment
 ```bash
