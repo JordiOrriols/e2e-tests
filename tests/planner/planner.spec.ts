@@ -44,7 +44,32 @@ async function authenticatedPage(browser: Browser, account: Account): Promise<{ 
   return { page, context };
 }
 
-test("estimates, priority scheduling, invitations and vacation ownership persist through Supabase", async ({ browser }) => {
+async function createRoster(account: Account, name: string) {
+  const team = await api<{ id: string }>(account, "rpc/create_team", {
+    method: "POST", body: JSON.stringify({ p_name: name }),
+  });
+  if (!team) throw new Error("Ladders team creation returned no row");
+  try {
+    const members = await api<{ id: string; vacation_token: string; self_token: string; peer_token: string; view_token: string }[]>(account, "members", {
+      method: "POST", headers: { Prefer: "return=representation" },
+      body: JSON.stringify([
+        { team_id: team.id, name: "Owner", role: "Senior Engineer", planning_role: "backend" },
+        { team_id: team.id, name: "Frontend", role: "Frontend Engineer", planning_role: "frontend" },
+      ]),
+    });
+    if (!members?.[0]) throw new Error("Ladders member creation returned no row");
+    return { team, members, ownerMember: members[0] };
+  } catch (error) {
+    await removeRoster(account, team.id);
+    throw error;
+  }
+}
+async function removeRoster(account: Account, team: string) {
+  await api(account, `members?team_id=eq.${team}`, { method: "DELETE" });
+  await api(account, `teams?id=eq.${team}`, { method: "DELETE" });
+}
+
+test("estimates, priority scheduling, linked Ladders teams and token vacations persist through Supabase", async ({ browser }) => {
   test.setTimeout(90_000);
   const owner = await signIn();
   const collaborator = await signIn(true);
@@ -56,18 +81,23 @@ test("estimates, priority scheduling, invitations and vacation ownership persist
       runtimeErrors.push(message.text());
   });
   const workspaceName = `Planner E2E ${randomUUID().slice(0, 8)}`;
+  const roster = await createRoster(owner, workspaceName);
   let workspaceId: string | undefined;
   let secondContext: BrowserContext | undefined;
   try {
     await expect(page.getByRole("heading", { name: /Microproject estimation|Your planning workspace/ })).toBeVisible();
     if (await page.getByRole("button", { name: "New workspace" }).isVisible()) await page.getByRole("button", { name: "New workspace" }).click();
     await page.getByLabel("Workspace name").fill(workspaceName);
-    await page.getByLabel("Your name", { exact: true }).fill("Owner");
     await page.getByRole("button", { name: "Create workspace", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Microproject estimation" })).toBeVisible();
     const workspaces = await api<{ id: string }[]>(owner, `planner_workspaces?name=eq.${encodeURIComponent(workspaceName)}&select=id`);
     workspaceId = workspaces?.[0]?.id;
     if (!workspaceId) throw new Error("Test workspace was not persisted");
+    await page.getByRole("link", { name: "Vacations", exact: true }).click();
+    await page.getByRole("checkbox", { name: workspaceName, exact: true }).check();
+    await page.getByRole("button", { name: "Save linked teams" }).click();
+    await expect(page.getByLabel("Planning role for Owner")).toHaveValue("backend");
+    await page.getByRole("link", { name: "Estimation", exact: true }).click();
 
     await expect(api(owner, "planner_projects", {
       method: "POST",
@@ -133,44 +163,51 @@ test("estimates, priority scheduling, invitations and vacation ownership persist
     await expect(page.getByLabel("Project schedule")).toContainText("Oct 9, 2026");
 
     await page.getByRole("link", { name: "Vacations", exact: true }).click();
-    await page.getByLabel("First day").fill("2026-10-05");
-    await page.getByLabel("Last day").fill("2026-10-06");
+    await page.getByLabel("Member", { exact: true }).selectOption(roster.ownerMember.id);
+    await page.getByLabel("From", { exact: true }).fill("2026-10-05");
+    await page.getByLabel("To", { exact: true }).fill("2026-10-06");
     await page.getByRole("button", { name: "Save availability" }).click();
-    await expect(page.getByText("2026-10-05 · Not working", { exact: true })).toBeVisible();
+    await expect(page.getByText("2026-10-05: Not working", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Backlog Plan" }).click();
     await page.getByLabel("Plan starts").fill("2026-10-05");
     await expect(page.getByLabel("Project schedule")).toContainText("Oct 14, 2026");
 
     await page.getByRole("link", { name: "Vacations", exact: true }).click();
-    await page.getByLabel("Name", { exact: true }).fill("Teammate");
-    await page.getByLabel("Email", { exact: true }).fill(collaborator.user.email);
-    await page.getByLabel("Role", { exact: true }).selectOption("frontend");
-    await page.getByRole("button", { name: "Invite member" }).click();
-    await expect(page.getByText("Frontend · Invited")).toBeVisible();
+    await api(owner, "rpc/share_team_by_email", {
+      method: "POST",
+      body: JSON.stringify({ p_team_id: roster.team.id, p_email: collaborator.user.email, p_access: "viewer" }),
+    });
 
     const second = await authenticatedPage(browser, collaborator);
     secondContext = second.context;
-    await second.page.getByRole("button", { name: `Join ${workspaceName}`, exact: true }).click();
     await second.page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId);
     await expect(second.page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
     await expect(second.page.getByRole("button", { name: "New microproject" })).toHaveCount(0);
     await second.page.getByRole("link", { name: "Vacations", exact: true }).click();
-    await second.page.getByLabel("First day").fill("2026-10-07");
-    await second.page.getByLabel("Last day").fill("2026-10-07");
-    await second.page.getByRole("button", { name: "Save availability" }).click();
-    await expect(second.page.getByText("2026-10-07 · Not working", { exact: true })).toBeVisible();
-    await second.page.getByRole("button", { name: "Owner Backend · Joined" }).click();
-    await expect(second.page.getByRole("button", { name: "Save availability" })).toHaveCount(0);
+    await expect(second.page.getByRole("button", { name: "Save availability" })).toBeDisabled();
+    await expect(second.page.getByLabel("Planning role for Owner")).toBeDisabled();
+    await expect(second.page.getByRole("button", { name: /Copy vacation link/ })).toHaveCount(0);
+    await expect(api(collaborator, "rpc/planner_set_team_availability", {
+      method: "POST", body: JSON.stringify({ member: roster.ownerMember.id, start_date: "2026-10-08", end_date: "2026-10-08", working: false }),
+    })).rejects.toThrow(/Team edit access/);
 
-    const members = await api<{ id: string; user_id: string }[]>(owner, `planner_members?workspace_id=eq.${workspaceId}&select=id,user_id`);
-    const ownerMember = members?.find(member => member.user_id === owner.user.id);
-    if (!ownerMember) throw new Error("Workspace owner member was not persisted");
-    const blocked = await fetch(`${url}/rest/v1/rpc/planner_set_availability`, {
-      method: "POST", headers: { apikey: key!, Authorization: `Bearer ${collaborator.access_token}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ member: ownerMember.id, start_date: "2026-10-08", end_date: "2026-10-08", working: false }),
-    });
-
-    expect(blocked.ok).toBe(false);
+    const anonymous = await browser.newContext();
+    try {
+      const vacationPage = await anonymous.newPage();
+      await vacationPage.goto(`http://127.0.0.1:5176/#/vacations/${roster.ownerMember.vacation_token}`);
+      await expect(vacationPage.getByRole("heading", { name: "Owner", exact: true })).toBeVisible();
+      await expect(vacationPage.getByLabel("Workspace", { exact: true })).toHaveCount(0);
+      await vacationPage.getByLabel("From", { exact: true }).fill("2026-10-07");
+      await vacationPage.getByLabel("To", { exact: true }).fill("2026-10-07");
+      await vacationPage.getByRole("button", { name: "Save availability" }).click();
+      await expect(vacationPage.getByText("2026-10-07: Not working", { exact: true })).toBeVisible();
+      await vacationPage.reload();
+      await expect(vacationPage.getByText("2026-10-07: Not working", { exact: true })).toBeVisible();
+      await vacationPage.getByRole("button", { name: "Restore calendar default for 2026-10-07", exact: true }).click();
+      await expect(vacationPage.getByText("2026-10-07: Not working", { exact: true })).toHaveCount(0);
+      await vacationPage.goto(`http://127.0.0.1:5176/#/vacations/${roster.ownerMember.self_token}`);
+      await expect(vacationPage.getByRole("alert")).toContainText("Invalid vacation link");
+    } finally { await anonymous.close(); }
 
     await page.getByRole("link", { name: "Estimation", exact: true }).click();
     await page.getByRole("button", { name: "Edit Checkout" }).click();
@@ -187,6 +224,7 @@ test("estimates, priority scheduling, invitations and vacation ownership persist
       workspaceId = rows?.[0]?.id;
     }
     if (workspaceId) await api(owner, `planner_workspaces?id=eq.${workspaceId}`, { method: "DELETE" });
+    await removeRoster(owner, roster.team.id);
     await secondContext?.close();
     await context.close();
   }
@@ -194,16 +232,17 @@ test("estimates, priority scheduling, invitations and vacation ownership persist
 
 test("backlog priorities can be reordered and different roles run in parallel", async ({ browser }) => {
   const owner = await signIn();
-  const workspace = await api<{ id: string }>(owner, "rpc/planner_create_workspace", {
+  const roster = await createRoster(owner, `Planner order team ${randomUUID().slice(0, 8)}`);
+  const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
     method: "POST",
-    body: JSON.stringify({ workspace_name: `Planner order ${randomUUID().slice(0, 8)}`, member_name: "Owner", member_role: "backend" }),
+    body: JSON.stringify({ workspace_name: `Planner order ${randomUUID().slice(0, 8)}` }),
   });
   if (!workspace) throw new Error("Workspace creation did not return a row");
   let context: BrowserContext | undefined;
   try {
-    await api(owner, "rpc/planner_invite_member", {
+    await api(owner, "rpc/planner_set_workspace_teams", {
       method: "POST",
-      body: JSON.stringify({ workspace: workspace.id, member_email: `${randomUUID()}@example.test`, member_name: "Frontend", member_role: "frontend" }),
+      body: JSON.stringify({ workspace: workspace.id, team_ids: [roster.team.id] }),
     });
     await api(owner, "planner_projects", {
       method: "POST",
@@ -232,14 +271,13 @@ test("backlog priorities can be reordered and different roles run in parallel", 
     await page.getByLabel("Plan starts").fill("2026-10-05");
     await expect(page.getByLabel("Second: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
     await page.getByRole("link", { name: "Vacations", exact: true }).click();
-    await page.getByRole("button", { name: "Edit Owner", exact: true }).click();
-    await page.getByLabel("Member role", { exact: true }).selectOption("design");
-    await page.getByRole("button", { name: "Save member", exact: true }).click();
-    await expect(page.getByText("Design · Joined")).toBeVisible();
+    await page.getByLabel("Planning role for Owner", { exact: true }).selectOption("design");
+    await expect(page.getByLabel("Planning role for Owner", { exact: true })).toHaveValue("design");
     await page.getByRole("link", { name: "Backlog Plan", exact: true }).click();
     await expect(page.getByLabel("Project schedule")).toContainText("No Backend capacity");
   } finally {
     await api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" });
+    await removeRoster(owner, roster.team.id);
     await context?.close();
   }
 });
