@@ -90,6 +90,19 @@ export type EvaluationRow = {
   author_name: string | null;
   current_levels: Record<string, number> | null;
   goal_levels: Record<string, number> | null;
+  comments: Record<string, string> | null;
+  created_at: string;
+};
+
+/** What a version looks like when it is written straight through the API. */
+export type EvaluationInput = {
+  kind: "manager" | "self" | "peer";
+  status?: "draft" | "published";
+  authorName?: string | null;
+  currentLevels?: Record<string, number>;
+  goalLevels?: Record<string, number>;
+  comments?: Record<string, string>;
+  createdAt?: string;
 };
 
 export type GoalRow = {
@@ -114,6 +127,7 @@ export class LaddersData {
   private readonly token: string;
   private readonly createdMembers = new Set<string>();
   private readonly createdTeams = new Set<string>();
+  private readonly createdEvaluations = new Set<string>();
 
   constructor(statePath?: string) {
     const s = session(statePath);
@@ -258,6 +272,56 @@ export class LaddersData {
     );
   }
 
+  /**
+   * Writes a version directly, which is how a test sets up a state the UI would
+   * need several steps to reach. An empty level map is sent as null, the same
+   * shape the app stores, so reads compare like for like.
+   */
+  async createEvaluation(
+    memberId: string,
+    input: EvaluationInput,
+  ): Promise<EvaluationRow> {
+    const row = await this.request<EvaluationRow>("evaluations", {
+      method: "POST",
+      prefer: "return=representation",
+      body: JSON.stringify({
+        member_id: memberId,
+        kind: input.kind,
+        status: input.status ?? "draft",
+        author_name: input.authorName ?? null,
+        current_levels: input.currentLevels ?? null,
+        goal_levels: input.goalLevels ?? null,
+        comments: input.comments ?? {},
+        ...(input.createdAt ? { created_at: input.createdAt } : {}),
+      }),
+    });
+    this.createdEvaluations.add(row.id);
+    return row;
+  }
+
+  async updateEvaluationStatus(
+    id: string,
+    status: "draft" | "published",
+  ): Promise<void> {
+    await this.request(`evaluations?id=eq.${id}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status }),
+    });
+  }
+
+  listGoals(memberId: string): Promise<GoalRow[]> {
+    return this.request<GoalRow[]>(
+      `smart_goals?member_id=eq.${memberId}&select=*&order=created_at`,
+    );
+  }
+
+  async appendGoalComment(goalId: string, text: string): Promise<GoalRow> {
+    return this.request<GoalRow>("rpc/append_goal_comment", {
+      method: "POST",
+      body: JSON.stringify({ p_id: goalId, p_text: text }),
+    });
+  }
+
   async goal(id: string): Promise<GoalRow | undefined> {
     const rows = await this.request<GoalRow[]>(
       `smart_goals?id=eq.${id}&select=*`,
@@ -308,6 +372,13 @@ export class LaddersData {
         failures.push(`member ${id}: ${describe(error)}`);
       }
     }
+    for (const id of this.createdEvaluations) {
+      try {
+        await this.request(`evaluations?id=eq.${id}`, { method: "DELETE" });
+      } catch (error) {
+        failures.push(`evaluation ${id}: ${describe(error)}`);
+      }
+    }
     let teams = 0;
     for (const id of this.createdTeams) {
       try {
@@ -319,6 +390,7 @@ export class LaddersData {
     }
     this.createdMembers.clear();
     this.createdTeams.clear();
+    this.createdEvaluations.clear();
     if (failures.length > 0) {
       throw new Error(
         `cleanup left ${failures.length} row(s) behind:\n  ${failures.join("\n  ")}`,
