@@ -69,6 +69,14 @@ export type MemberRow = {
 
 export type TeamRow = { id: string; name: string; is_default: boolean };
 
+export type TeamShareRow = {
+  team_id: string;
+  user_id: string;
+  email: string;
+  access_level: "viewer" | "editor";
+  shared_at: string;
+};
+
 export type EvaluationRow = {
   id: string;
   member_id: string;
@@ -175,6 +183,44 @@ export class LaddersData {
 
   async deleteTeam(id: string): Promise<void> {
     await this.request(`teams?id=eq.${id}`, { method: "DELETE" });
+  }
+
+  /* Team sharing */
+
+  listShares(teamId: string): Promise<TeamShareRow[]> {
+    return this.request<TeamShareRow[]>("rpc/list_team_shares", {
+      method: "POST",
+      body: JSON.stringify({ p_team_id: teamId }),
+    });
+  }
+
+  shareTeam(teamId: string, email: string, access: "viewer" | "editor") {
+    return this.request("rpc/share_team_by_email", {
+      method: "POST",
+      body: JSON.stringify({
+        p_team_id: teamId,
+        p_email: email,
+        p_access: access,
+      }),
+    });
+  }
+
+  updateShare(teamId: string, userId: string, access: "viewer" | "editor") {
+    return this.request("rpc/update_team_share", {
+      method: "POST",
+      body: JSON.stringify({
+        p_team_id: teamId,
+        p_user_id: userId,
+        p_access: access,
+      }),
+    });
+  }
+
+  removeShare(teamId: string, userId: string) {
+    return this.request("rpc/remove_team_share", {
+      method: "POST",
+      body: JSON.stringify({ p_team_id: teamId, p_user_id: userId }),
+    });
   }
 
   listEvaluations(memberId: string): Promise<EvaluationRow[]> {
