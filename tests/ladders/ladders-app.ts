@@ -212,7 +212,8 @@ export class LaddersApp {
   }
 
   /** Picks a current level for a competency. The first vertical is expanded by default. */
-  async setLevel(vertical: string, level: number): Promise<void> {
+  /** The level buttons only exist once the vertical is expanded. */
+  private async revealLevel(vertical: string, level: number): Promise<Locator> {
     const container = this.page.getByTestId(`level-vertical-${vertical}`);
     await container.scrollIntoViewIfNeeded();
 
@@ -221,7 +222,21 @@ export class LaddersApp {
       await this.page.getByTestId(`level-toggle-${vertical}`).click();
       await expect(button).toBeVisible();
     }
-    await button.click();
+    return button;
+  }
+
+  async setLevel(vertical: string, level: number): Promise<void> {
+    await (await this.revealLevel(vertical, level)).click();
+  }
+
+  /**
+   * Whether a level is the one currently chosen, without changing anything: a
+   * form that arrives empty is the point of several tests, and clicking a level
+   * to find out would be the opposite of a read only check.
+   */
+  async levelIsSelected(vertical: string, level: number): Promise<boolean> {
+    const button = await this.revealLevel(vertical, level);
+    return (await button.getAttribute("data-selected")) === "true";
   }
 
   /**
