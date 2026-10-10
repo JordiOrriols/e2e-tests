@@ -11,7 +11,7 @@ test("shared self, peer and view pages reuse branding, language selection and fo
     await expect(shared.page.getByTestId("page-message")).toHaveCount(0);
     const header = shared.page.getByTestId("assessment-header");
     await expect(header).toBeVisible();
-    await expect(header.locator("svg.lucide-layout-grid")).toBeVisible();
+    await expect(header.locator("svg.lucide-trending-up")).toBeVisible();
     for (const [language, footer] of [
       ["Español", "Hecho con amor por Jordi Orriols"],
       ["Català", "Fet amb amor per Jordi Orriols"],
@@ -90,7 +90,7 @@ test("footer remains available on welcome and invalid shared-link pages", async 
     await shared.open(path);
     await expect(shared.page.getByTestId("app-footer")).toHaveText("Made with love by Jordi Orriols");
     if (path.includes("/v/")) {
-      await expect(shared.page.getByTestId("assessment-header").locator("svg.lucide-layout-grid")).toBeVisible();
+      await expect(shared.page.getByTestId("assessment-header").locator("svg.lucide-trending-up")).toBeVisible();
       await expect(shared.page.getByTestId("language-selector")).toBeVisible();
     }
   }
