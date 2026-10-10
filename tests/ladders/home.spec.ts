@@ -3,7 +3,7 @@ import {
   LaddersHomePage,
   LaddersMemberDetailsPanel,
 } from "../../pages/ladders";
-import { waitForPageReady } from "../../utils";
+import { expectNoAnalytics, waitForPageReady } from "../../utils";
 import { uniqueName } from "./ladders-app";
 
 test.describe("Ladders Home Page", () => {
@@ -158,6 +158,16 @@ test.describe("Ladders Language", () => {
     await expect(page.getByTestId("language-button-fr")).toBeVisible();
     await expect(page.getByTestId("language-button-de")).toBeVisible();
     await expect(page.getByTestId("language-button-it")).toBeVisible();
+  });
+
+  test("does not report analytics from automated test runs", async ({ page }) => {
+    const homePage = new LaddersHomePage(page);
+    await expectNoAnalytics(page, async () => {
+      await homePage.goto();
+      await page.getByTestId("language-selector").click();
+      await page.getByTestId("language-button-en").click();
+      await page.waitForLoadState("networkidle");
+    });
   });
 
   test("should switch language", async ({ page }) => {

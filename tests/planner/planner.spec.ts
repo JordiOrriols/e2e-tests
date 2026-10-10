@@ -2,6 +2,7 @@ import { test, expect, type Browser, type Page, type BrowserContext } from "@pla
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
+import { expectNoAnalytics } from "../../utils";
 
 const env = Object.fromEntries(readFileSync(resolve(import.meta.dirname, "../../../planner/.env"), "utf8")
   .split("\n").map(line => line.match(/^\s*(VITE_SUPABASE_\w+)\s*=\s*(.*?)\s*$/))
@@ -290,6 +291,13 @@ test("backlog priorities can be reordered and different roles run in parallel", 
     await removeRoster(owner, roster.team.id);
     await context?.close();
   }
+});
+
+test("automated test runs do not report analytics", async ({ page }) => {
+  await expectNoAnalytics(page, async () => {
+    await page.goto("/");
+    await page.waitForLoadState("networkidle");
+  });
 });
 
 test("anonymous shared login exposes recovery and delegates it without sending real email", async ({ page }) => {
