@@ -115,6 +115,16 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     await page.getByRole("menuitemradio", { name: "Español" }).click();
     await expect(page.getByRole("link", { name: "Plan del backlog" })).toBeVisible();
     await expect(page.getByTestId("sign-out-button")).toHaveAccessibleName("Cerrar sesión");
+    for (const [language, backlog, signOut] of [
+      ["Français", "Plan du backlog", "Se déconnecter"],
+      ["Deutsch", "Backlog-Plan", "Abmelden"],
+      ["Italiano", "Piano backlog", "Esci"],
+    ]) {
+      await page.getByTestId("language-selector").click();
+      await page.getByRole("menuitemradio", { name: language }).click();
+      await expect(page.getByRole("link", { name: backlog })).toBeVisible();
+      await expect(page.getByTestId("sign-out-button")).toHaveAccessibleName(signOut);
+    }
     await page.getByTestId("language-selector").click();
     await page.getByRole("menuitemradio", { name: "English" }).click();
     await page.setViewportSize({ width: 375, height: 812 });

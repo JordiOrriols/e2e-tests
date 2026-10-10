@@ -15,6 +15,9 @@ test("shared self, peer and view pages reuse branding, language selection and fo
     for (const [language, footer] of [
       ["Español", "Hecho con amor por Jordi Orriols"],
       ["Català", "Fet amb amor per Jordi Orriols"],
+      ["Français", "Créé avec amour par Jordi Orriols"],
+      ["Deutsch", "Mit Liebe gemacht von Jordi Orriols"],
+      ["Italiano", "Creato con amore da Jordi Orriols"],
       ["English", "Made with love by Jordi Orriols"],
     ]) {
       // Hash routes are same-document navigations, so the previous route's

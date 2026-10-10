@@ -155,6 +155,9 @@ test.describe("Ladders Language", () => {
     await expect(page.getByTestId("language-button-en")).toBeVisible();
     await expect(page.getByTestId("language-button-es")).toBeVisible();
     await expect(page.getByTestId("language-button-ca")).toBeVisible();
+    await expect(page.getByTestId("language-button-fr")).toBeVisible();
+    await expect(page.getByTestId("language-button-de")).toBeVisible();
+    await expect(page.getByTestId("language-button-it")).toBeVisible();
   });
 
   test("should switch language", async ({ page }) => {
@@ -175,6 +178,12 @@ test.describe("Ladders Language", () => {
     await pick("ca");
     await page.waitForTimeout(500);
     await expect(page.getByTestId("language-selector")).toContainText("CA");
+
+    for (const code of ["fr", "de", "it"]) {
+      await openMenu();
+      await pick(code);
+      await expect(page.getByTestId("language-selector")).toContainText(code.toUpperCase());
+    }
 
     await openMenu();
     await pick("en");
