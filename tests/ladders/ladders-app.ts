@@ -27,6 +27,27 @@ export function uniqueName(prefix: string): string {
   return `${prefix} ${stamp}${unique}-${counter}`;
 }
 
+/** Names given to rows created by the suites (see scripts/cleanup-ladders-data.ts). */
+export const TEST_DATA_NAME = /^(E2E|Probe|ZZ)/;
+
+/**
+ * Removes teams and members created by suites running in parallel, so full-page
+ * snapshots only show the account's stable data. Nodes are detached rather than
+ * hidden because Tailwind's `space-y-*` spacing depends on `:last-child`.
+ */
+export async function hideConcurrentTestData(page: Page): Promise<void> {
+  await page.getByTestId("member-list").evaluate((list, source) => {
+    const name = new RegExp(source);
+    const hide = (element: Element | null, label: string | null | undefined) => {
+      if (element && name.test(label?.trim() ?? "")) element.remove();
+    };
+    list.querySelectorAll("section[aria-label]").forEach((team) => hide(team, team.getAttribute("aria-label")));
+    list.querySelectorAll('[data-testid^="member-card-"]').forEach((member) =>
+      hide(member, member.querySelector('[data-testid="member-name"]')?.textContent)
+    );
+  }, TEST_DATA_NAME.source);
+}
+
 /** The app uses a HashRouter, so routes live under `#/`. */
 export function ladderPath(path: string): string {
   const clean = path.replace(/^\//, "");

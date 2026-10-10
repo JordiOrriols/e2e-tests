@@ -1,6 +1,7 @@
 import { test, expect } from "../../fixtures";
 import { LaddersHomePage } from "../../pages/ladders";
 import { waitForPageReady } from "../../utils";
+import { hideConcurrentTestData } from "./ladders-app";
 
 test.describe("Ladders Visual Regression @visual", () => {
   test("home page snapshot - desktop", async ({ page, takeSnapshot }) => {
@@ -8,6 +9,7 @@ test.describe("Ladders Visual Regression @visual", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
     await waitForPageReady(page);
+    await hideConcurrentTestData(page);
 
     await takeSnapshot("home-desktop");
   });
@@ -17,6 +19,7 @@ test.describe("Ladders Visual Regression @visual", () => {
     await page.setViewportSize({ width: 768, height: 1024 });
     await homePage.goto();
     await waitForPageReady(page);
+    await hideConcurrentTestData(page);
 
     await takeSnapshot("home-tablet");
   });
@@ -26,6 +29,7 @@ test.describe("Ladders Visual Regression @visual", () => {
     await page.setViewportSize({ width: 375, height: 667 });
     await homePage.goto();
     await waitForPageReady(page);
+    await hideConcurrentTestData(page);
 
     await takeSnapshot("home-mobile");
   });
@@ -38,6 +42,7 @@ test.describe("Ladders Visual Regression @visual", () => {
     const homePage = new LaddersHomePage(page);
     await homePage.goto();
     await waitForPageReady(page);
+    await hideConcurrentTestData(page);
 
     console.log(`Current environment: ${environment}`);
     console.log(`Comparison URL: ${getComparisonUrl("/")}`);
@@ -82,6 +87,7 @@ test.describe("Ladders Form Snapshots @visual", () => {
     await page.setViewportSize({ width: 1280, height: 720 });
     await homePage.goto();
     await waitForPageReady(page);
+    await hideConcurrentTestData(page);
 
     const refButton = page.getByTestId("reference-button");
     if (await refButton.isVisible()) {
