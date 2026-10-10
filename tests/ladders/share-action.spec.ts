@@ -11,16 +11,6 @@ import { LaddersApp, uniqueName } from "./ladders-app";
 const MAIN = "split-button-member_share_self";
 const MENU = "split-menu-member_share_self";
 
-/** The alert is the only feedback the control gives, so it is worth reading. */
-function watchAlerts(page: import("@playwright/test").Page): string[] {
-  const seen: string[] = [];
-  page.on("dialog", (dialog) => {
-    seen.push(dialog.message());
-    void dialog.dismiss();
-  });
-  return seen;
-}
-
 /** Picks a link out of the menu and waits for the copy to land. */
 async function copyFromMenu(
   page: import("@playwright/test").Page,
@@ -41,7 +31,6 @@ test.describe("Ladders share action @sharing", () => {
     page,
   }) => {
     const member = await seedMember(data, uniqueName("E2E CopySelf"));
-    const alerts = watchAlerts(page);
 
     const app = new LaddersApp(page);
     await app.gotoHome();
@@ -51,12 +40,15 @@ test.describe("Ladders share action @sharing", () => {
     await expect
       .poll(() => clipboard(page))
       .toBe(`http://localhost:5175/#/e/${member.self_token}`);
-    expect(alerts).toContain("Link copied to clipboard!");
+    await expect(page.getByTestId("alert-modal")).toContainText("Link copied to clipboard!");
+    await page.getByTestId("alert-modal-close").click();
+    await expect(page.getByTestId("alert-modal")).toBeHidden();
+    await page.getByTestId(MENU).click();
+    await expect(page.getByTestId("split-item-member_share_peer")).toBeVisible();
   });
 
   test("the menu copies the peer evaluation link", async ({ data, page }) => {
     const member = await seedMember(data, uniqueName("E2E CopyPeer"));
-    watchAlerts(page);
 
     const app = new LaddersApp(page);
     await app.gotoHome();
@@ -75,7 +67,6 @@ test.describe("Ladders share action @sharing", () => {
     const member = await seedMember(data, uniqueName("E2E CopyView"));
     // The link exists from the start; sharing it is what the manager decides.
     expect(member.view_enabled).toBe(false);
-    watchAlerts(page);
 
     const app = new LaddersApp(page);
     await app.gotoHome();
@@ -151,14 +142,13 @@ test.describe("Ladders share action @sharing", () => {
         value: { writeText: () => Promise.reject(new Error("denied")) },
       });
     });
-    const alerts = watchAlerts(page);
 
     const app = new LaddersApp(page);
     await app.gotoHome();
     await app.openTeamMember(member.name);
     await page.getByTestId(MAIN).click();
 
-    await expect.poll(() => alerts).toContain("Failed to copy link");
+    await expect(page.getByTestId("alert-modal")).toContainText("Failed to copy link");
   });
 
   test("a browser without the clipboard API falls back to a hidden textarea", async ({
@@ -184,7 +174,6 @@ test.describe("Ladders share action @sharing", () => {
         return false;
       };
     });
-    const alerts = watchAlerts(page);
 
     const app = new LaddersApp(page);
     await app.gotoHome();
@@ -199,6 +188,6 @@ test.describe("Ladders share action @sharing", () => {
         ),
       )
       .toBe(`http://localhost:5175/#/e/${member.self_token}`);
-    expect(alerts).toContain("Link copied to clipboard!");
+    await expect(page.getByTestId("alert-modal")).toContainText("Link copied to clipboard!");
   });
 });

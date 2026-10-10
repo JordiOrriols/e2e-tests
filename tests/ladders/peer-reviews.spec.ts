@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { LaddersApp, uniqueName } from "./ladders-app";
+import { LaddersApp, uniqueName, captureNextAlert } from "./ladders-app";
 import { seedMember } from "./fixtures";
 
 /**
@@ -57,16 +57,8 @@ test.describe("Ladders peer reviews @peers", () => {
 
     await app.setLevel(TEAM, 3);
 
-    const said = new Promise<string>((resolve) => {
-      shared.page.once("dialog", (dialog) => {
-        const message = dialog.message();
-        // Leaving the dialog open would block the click that raised it.
-        void dialog.dismiss().then(() => resolve(message));
-      });
-    });
-    await app.publishButton.click();
-
-    expect(await said).toBe("Please enter your name before submitting.");
+    const said = await captureNextAlert(shared.page, () => app.publishButton.click());
+    expect(said).toBe("Please enter your name before submitting.");
 
     // The refusal happens before anything is written, not after a partial save.
     await expect

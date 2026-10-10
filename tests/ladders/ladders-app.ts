@@ -186,7 +186,13 @@ export class LaddersApp {
   async publishMember(): Promise<void> {
     const publish = this.publishButton;
     await expect(publish).toBeEnabled({ timeout: DATA_TIMEOUT });
+    const peer = await this.page.getByTestId("assessment-author").isVisible();
     await publish.click();
+    if (!peer) {
+      await expect(this.page.getByTestId("alert-modal")).toBeVisible();
+      await this.page.getByTestId("alert-modal-close").click();
+      await expect(this.page.getByTestId("alert-modal")).toBeHidden();
+    }
   }
 
   /**
@@ -491,22 +497,19 @@ export class LaddersApp {
 /**
  * Reads the last alert the app raised.
  *
- * Share and copy actions report through window.alert, which Playwright exposes
- * as a dialog event instead of DOM.
+ * Share and copy actions report through the shared accessible alert modal.
  */
 export async function captureNextAlert(
   page: Page,
   action: () => Promise<void>,
 ): Promise<string> {
-  const promise = new Promise<string>((resolve) => {
-    page.once("dialog", async (dialog) => {
-      const message = dialog.message();
-      await dialog.dismiss();
-      resolve(message);
-    });
-  });
   await action();
-  return promise;
+  const modal = page.getByTestId("alert-modal");
+  await expect(modal).toBeVisible();
+  const message = await modal.locator('[data-slot="alert-dialog-description"]').innerText();
+  await page.getByTestId("alert-modal-close").click();
+  await expect(modal).toBeHidden();
+  return message;
 }
 
 /** Grants clipboard permissions so copy-to-clipboard can be asserted. */
