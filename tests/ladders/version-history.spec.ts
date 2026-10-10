@@ -22,6 +22,7 @@ async function memberWithHistory(
   const ana = await data.createEvaluation(member.id, {
     kind: "peer",
     authorName: ANA,
+    comments: { Technology: "Ana's technology note" },
   });
   const ben = await data.createEvaluation(member.id, {
     kind: "peer",
@@ -132,10 +133,12 @@ test.describe("Ladders version history @versions", () => {
       rowFor(page, ANA).getByTestId("version-compare"),
     ).toHaveAttribute("aria-pressed", "true");
     // The comparison is read as another set of comments on the current version.
-    await expect(page.getByTestId("comment-groups")).toContainText(ANA);
+    const comparedComments = page.getByTestId("assessment-comments");
+    await expect(comparedComments).toContainText(ANA);
+    await expect(comparedComments).toContainText("Ana's technology note");
 
     await rowFor(page, ANA).getByTestId("version-compare").click();
-    await expect(page.getByTestId("comment-groups")).not.toContainText(ANA);
+    await expect(comparedComments).not.toContainText(ANA);
   });
 
   test("a peer version can be sent back to draft and published again", async ({
@@ -188,37 +191,50 @@ test.describe("Ladders version history @versions", () => {
     page,
     shared,
   }) => {
-    const { member, manager } = await memberWithHistory(data);
+    const { member, manager, ana } = await memberWithHistory(data);
 
     const app = new LaddersApp(page);
     await app.gotoHome();
     await app.openTeamMember(member.name);
 
+    await expect(page.getByTestId("version-row")).toHaveCount(3);
+
     const authors = async () =>
       await shared.page.getByTestId("version-author").allInnerTexts();
+    const reopen = async () => {
+      await shared.open(`/#/v/${member.view_token}`);
+      await expect(shared.page.getByTestId("assessment-header")).toBeVisible();
+    };
 
-    // Only published versions reach the person, so one author's draft is not
-    // theirs to read even though the manager can see it in the history.
-    expect(await authors()).toHaveLength(1);
-    expect((await authors())[0]).toContain("Manager");
+    // Only published versions reach the person, so drafts the manager sees in
+    // the history are not theirs to read yet.
+    await reopen();
+    await expect.poll(async () => (await authors()).length).toBe(0);
 
     await data.updateEvaluationStatus(manager.id, "published");
-    await expect.poll(async () => (await authors()).length).toBe(2);
+    await reopen();
+    await expect.poll(authors).toEqual([expect.stringContaining("Manager")]);
 
-    // Self versions are the one draft the person is allowed to see.
-    const self = await data.createEvaluation(member.id, { kind: "self" });
-    await data.setViewEnabled(member.id, true);
-    await shared.page.reload();
-    await expect.poll(async () => (await authors()).length).toBe(3);
-    expect(
-      await shared.page
-        .getByTestId("version-row")
-        .filter({ hasText: "Self" })
-        .count(),
-    ).toBe(1);
+    // Self versions are the one draft the person is allowed to see. Only the
+    // self link may write one, so it is submitted there and then returned to
+    // draft by the manager.
+    await shared.open(`/#/e/${member.self_token}`);
+    await shared.app.setLevel("Technology", 2);
+    await shared.app.publishButton.click();
+    const selfVersion = async () =>
+      (await data.listEvaluations(member.id)).find((e) => e.kind === "self");
+    await expect.poll(async () => (await selfVersion())?.status).toBe("published");
+    const self = (await selfVersion())!;
+    await data.updateEvaluationStatus(self.id, "draft");
+    await reopen();
+    await expect.poll(async () => (await authors()).length).toBe(2);
+    await expect(
+      shared.page.getByTestId("version-row").filter({ hasText: "Self" }),
+    ).toHaveCount(1);
 
     await data.updateEvaluationStatus(self.id, "published");
-    await shared.page.reload();
-    await expect.poll(async () => (await authors()).length).toBe(4);
+    await data.updateEvaluationStatus(ana.id, "published");
+    await reopen();
+    await expect.poll(async () => (await authors()).length).toBe(3);
   });
 });
