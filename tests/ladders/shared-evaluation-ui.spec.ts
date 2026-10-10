@@ -12,18 +12,20 @@ test("shared self, peer and view pages reuse branding, language selection and fo
     const header = shared.page.getByTestId("assessment-header");
     await expect(header).toBeVisible();
     await expect(header.locator("svg.lucide-layout-grid")).toBeVisible();
-    await shared.page.getByTestId("language-selector").click();
-    await shared.page.getByRole("menuitemradio", { name: "Español" }).press("Enter");
-    await expect(shared.page.getByRole("menuitemradio", { name: "Español" })).toBeHidden();
-    await expect(shared.page.getByTestId("app-footer")).toHaveText("Hecho con amor por Jordi Orriols");
-    await shared.page.getByTestId("language-selector").click();
-    await shared.page.getByRole("menuitemradio", { name: "Català" }).press("Enter");
-    await expect(shared.page.getByRole("menuitemradio", { name: "Català" })).toBeHidden();
-    await expect(shared.page.getByTestId("app-footer")).toHaveText("Fet amb amor per Jordi Orriols");
-    await shared.page.getByTestId("language-selector").click();
-    await shared.page.getByRole("menuitemradio", { name: "English" }).press("Enter");
-    await expect(shared.page.getByRole("menuitemradio", { name: "English" })).toBeHidden();
-    await expect(shared.page.getByTestId("app-footer")).toHaveText("Made with love by Jordi Orriols");
+    for (const [language, footer] of [
+      ["Español", "Hecho con amor por Jordi Orriols"],
+      ["Català", "Fet amb amor per Jordi Orriols"],
+      ["English", "Made with love by Jordi Orriols"],
+    ]) {
+      // Hash routes are same-document navigations, so the previous route's
+      // header can still be mounted for a moment; retry until the menu opens.
+      await expect(async () => {
+        await shared.page.getByTestId("language-selector").click();
+        await shared.page.getByRole("menuitemradio", { name: language }).press("Enter", { timeout: 1_000 });
+      }).toPass();
+      await expect(shared.page.getByRole("menuitemradio", { name: language })).toBeHidden();
+      await expect(shared.page.getByTestId("app-footer")).toHaveText(footer);
+    }
     await shared.page.setViewportSize({ width: 375, height: 812 });
     await expect(shared.page.getByTestId("language-selector")).toBeVisible();
     expect(await shared.page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
