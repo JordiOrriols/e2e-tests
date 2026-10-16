@@ -35,7 +35,8 @@ export async function authenticatedPage(browser: Browser, account: Account): Pro
   const context = await browser.newContext();
   await context.addInitScript(({ storageKey, session }) => {
     localStorage.setItem(storageKey, JSON.stringify(session));
-    localStorage.setItem("i18nextLng", "en");
+    // Start in English, but keep a language the test picked across reloads.
+    if (!localStorage.getItem("i18nextLng")) localStorage.setItem("i18nextLng", "en");
   }, {
     storageKey: `sb-${new URL(url!).hostname.split(".")[0]}-auth-token`, session: account,
   });
