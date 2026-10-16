@@ -123,7 +123,7 @@ test.describe("Planner feature estimation", () => {
     );
     await expect(
       card(page, "Dark mode").getByRole("heading", { level: 3 }),
-    ).toHaveText("Dark mode");
+    ).toHaveText("GeneralDark mode");
 
     // Backend and frontend overlap (3 people); QA follows for one more week.
     await expect(checkout).toContainText("Peak team3people");
@@ -239,6 +239,13 @@ test.describe("Planner feature estimation", () => {
     await expect(
       dialog.getByLabel("Rename Growth", { exact: true }),
     ).toBeVisible();
+    // Projects that still hold features cannot be deleted.
+    await expect(
+      dialog.getByRole("button", { name: "Delete Payments", exact: true }),
+    ).toBeDisabled();
+    await expect(
+      dialog.getByRole("button", { name: "Delete Growth", exact: true }),
+    ).toBeEnabled();
     await dialog.getByRole("button", { name: "Done", exact: true }).click();
 
     await page

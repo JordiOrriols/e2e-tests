@@ -2,7 +2,7 @@ import { test, expect, type BrowserContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { expectNoAnalytics } from "../../utils";
 import {
-  api, authenticatedPage, calendarDay, createRoster, createWorkspace, removeWorkspace, roadmapRowAction, selectWorkspace,
+  addFeatures, api, authenticatedPage, calendarDay, createRoster, createWorkspace, ensureProject, removeWorkspace, roadmapRowAction, selectWorkspace,
   setAvailability, setPlanStart, showMonth, signIn, vacationBadge,
 } from "./planner-helpers";
 
@@ -49,7 +49,7 @@ test("estimates, priority scheduling, workspace teams and token vacations persis
     await expect(api(owner, "features", {
       method: "POST",
       body: JSON.stringify({
-        workspace_id: workspaceId, name: "Rejected fractional estimate",
+        project_id: await ensureProject(owner, workspaceId), name: "Rejected fractional estimate",
         backend_devs: 1, backend_weeks: 1.5,
       }),
     })).rejects.toThrow(/features_whole_estimates/);
@@ -86,6 +86,9 @@ test("estimates, priority scheduling, workspace teams and token vacations persis
     await page.setViewportSize({ width: 1280, height: 900 });
     await page.getByRole("button", { name: "New feature" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Checkout");
+    // Every feature belongs to a project, which can be created from the form.
+    await page.getByLabel("Project", { exact: true }).selectOption({ label: "+ New project" });
+    await page.getByLabel("New project name", { exact: true }).fill("Launch");
     for (const role of ["Backend", "Frontend", "Design", "QA"]) {
       for (const field of ["people", "weeks"]) {
         const input = page.getByLabel(`${role} ${field}`, { exact: true });
@@ -98,7 +101,7 @@ test("estimates, priority scheduling, workspace teams and token vacations persis
     await page.getByLabel("Backend people").fill("1");
     await page.getByLabel("Backend weeks").fill("1");
     await page.getByRole("button", { name: "Create feature" }).click();
-    await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
+    await expect(page.getByRole("article", { name: "Checkout", exact: true }).getByRole("heading", { level: 3 })).toHaveText("LaunchCheckout");
     await page.getByRole("link", { name: "Roadmap", exact: true }).click();
     await page.getByRole("button", { name: "Add feature", exact: true }).first().click();
     await page.getByRole("dialog").getByRole("button", { name: "Add feature to roadmap: Checkout", exact: true }).click();
@@ -136,7 +139,7 @@ test("estimates, priority scheduling, workspace teams and token vacations persis
     const second = await authenticatedPage(browser, collaborator);
     secondContext = second.context;
     await selectWorkspace(second.page, workspaceName);
-    await expect(second.page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
+    await expect(second.page.getByRole("article", { name: "Checkout", exact: true }).getByRole("heading", { level: 3 })).toHaveText("LaunchCheckout");
     await expect(second.page.getByRole("button", { name: "New feature" })).toHaveCount(0);
     await second.page.getByRole("link", { name: "Vacations", exact: true }).click();
     await showMonth(second.page, "2026-10-05");
@@ -194,16 +197,11 @@ test("roadmap priorities can be reordered and different roles run in parallel", 
   let context: BrowserContext | undefined;
   try {
     await createRoster(owner, `Planner order team ${randomUUID().slice(0, 8)}`, undefined, workspace.id);
-    await api(owner, "features", {
-      method: "POST",
-      body: JSON.stringify(["First", "Second"].map((name, index) => ({
-        workspace_id: workspace.id, name, in_backlog: true, priority: index + 1, backend_devs: 1, backend_weeks: 1,
-      }))),
-    });
-    await api(owner, "features", {
-      method: "POST",
-      body: JSON.stringify({ workspace_id: workspace.id, name: "Parallel frontend", in_backlog: true, priority: 3, frontend_devs: 1, frontend_weeks: 1 }),
-    });
+    await addFeatures(owner, workspace.id, [
+      { name: "First", backend_devs: 1, backend_weeks: 1 },
+      { name: "Second", backend_devs: 1, backend_weeks: 1 },
+      { name: "Parallel frontend", frontend_devs: 1, frontend_weeks: 1 },
+    ]);
     const opened = await authenticatedPage(browser, owner);
     context = opened.context;
     const page = opened.page;
@@ -265,12 +263,7 @@ test("Ladders shares a personal vacation link and its leave shapes the plan of t
   try {
     const roster = await createRoster(owner, `Shared roster ${suffix}`, undefined, workspace.id);
     await createRoster(owner, `Design roster ${suffix}`, [{ name: "Grace", planning_role: "design" }], workspace.id);
-    await api(owner, "features", {
-      method: "POST", body: JSON.stringify({
-        workspace_id: workspace.id, name: "Shared checkout", in_backlog: true,
-        backend_devs: 1, backend_weeks: 1,
-      }),
-    });
+    await addFeatures(owner, workspace.id, [{ name: "Shared checkout", backend_devs: 1, backend_weeks: 1 }]);
     const opened = await authenticatedPage(browser, owner);
     context = opened.context;
     const page = opened.page;

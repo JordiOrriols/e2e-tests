@@ -143,12 +143,26 @@ export async function removeWorkspace(owner: Account, workspace: string) {
   for (const team of teams ?? []) await removeRoster(owner, team.id);
   await api(owner, `workspaces?id=eq.${workspace}`, { method: "DELETE" });
 }
+/** Every feature needs a project; this finds or creates one by name in the workspace. */
+export async function ensureProject(owner: Account, workspaceId: string, name = "General") {
+  const existing = await api<{ id: string }[]>(
+    owner, `projects?workspace_id=eq.${workspaceId}&name=eq.${encodeURIComponent(name)}&select=id`,
+  );
+  if (existing?.[0]) return existing[0].id;
+  const created = await api<{ id: string }[]>(owner, "projects", {
+    method: "POST", headers: { Prefer: "return=representation" }, body: JSON.stringify({ workspace_id: workspaceId, name }),
+  });
+  if (!created?.[0]) throw new Error("Project creation did not return a row");
+  return created[0].id;
+}
+/** Features without a project_id go into the workspace's "General" project. */
 export async function addFeatures(owner: Account, workspaceId: string, features: Feature[]) {
+  const general = features.some(feature => !feature.project_id) ? await ensureProject(owner, workspaceId) : undefined;
   await api(owner, "features", {
     method: "POST",
     body: JSON.stringify(features.map((feature, index) => ({
       // A bulk insert needs every row to carry the same columns.
-      workspace_id: workspaceId, in_backlog: true, priority: index + 1, project_id: null,
+      in_backlog: true, priority: index + 1, project_id: general,
       ...Object.fromEntries(ROLE_FIELDS.map(field => [field, 0])), ...feature,
     }))),
   });
