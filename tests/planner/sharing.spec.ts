@@ -27,7 +27,7 @@ test.describe("Planner workspace sharing", () => {
     const roster = await createRoster(owner, `Shared ${randomUUID().slice(0, 8)}`);
     cleanup.push(() => removeRoster(owner, roster.team.id));
     const workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
     await addFeatures(owner, workspace.id, [{ name: "Checkout", backend_devs: 1, backend_weeks: 1 }]);
 
     const ownerPage = (await authenticatedPage(browser, owner)).page;
@@ -84,7 +84,7 @@ test.describe("Planner workspace sharing", () => {
 
   test("the workspace menu creates a workspace and switches to it", async ({ browser }) => {
     const name = `Created ${randomUUID().slice(0, 8)}`;
-    cleanup.push(() => api(owner, `planner_workspaces?name=eq.${encodeURIComponent(name)}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?name=eq.${encodeURIComponent(name)}`, { method: "DELETE" }));
     const { page, context } = await authenticatedPage(browser, owner);
     contexts.push(context);
     await waitForWorkspace(page);

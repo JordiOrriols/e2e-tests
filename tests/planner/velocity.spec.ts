@@ -46,11 +46,11 @@ test.describe("Planner squad velocity", () => {
     const beta = await createRoster(owner, teams[1]!, [{ name: "Dana", planning_role: "design" }]);
     cleanup.push(() => removeRoster(owner, beta.team.id));
     workspace = await seedRoadmap(owner, alpha.team.id, []);
-    cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
     await api(owner, "rpc/planner_set_workspace_teams", {
       method: "POST", body: JSON.stringify({ workspace: workspace.id, team_ids: [alpha.team.id, beta.team.id] }),
     });
-    await api(owner, `planner_workspaces?id=eq.${workspace.id}`, {
+    await api(owner, `workspaces?id=eq.${workspace.id}`, {
       method: "PATCH", body: JSON.stringify({ sprint_start_date: "2026-09-07" }),
     });
     ({ context, page } = await authenticatedPage(browser, owner));
@@ -145,7 +145,7 @@ test.describe("Planner squad velocity", () => {
     ];
     await expect(velocity(page)).toContainText("Estimated story points per sprint");
     await expect.poll(async () => (await velocityTable(page)).slice(0, 3)).toEqual(forecast);
-    expect(await api(owner, `planner_workspaces?id=eq.${workspace.id}&select=sprint_start_date,sprint_history`)).toEqual([{
+    expect(await api(owner, `workspaces?id=eq.${workspace.id}&select=sprint_start_date,sprint_history`)).toEqual([{
       sprint_start_date: "2026-09-07",
       sprint_history: [{ start_date: "2026-09-07", story_points: 27 }, { start_date: "2026-09-21", story_points: 54 }],
     }]);

@@ -45,7 +45,7 @@ test.describe("Planner roadmap", () => {
     ]);
     cleanup.push(() => removeRoster(owner, roster.team.id));
     const workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
     await addFeatures(owner, workspace.id, [
       { name: "Back Task", backend_devs: 2, backend_weeks: 2 },
       { name: "1 Back Task Second", backend_devs: 1, backend_weeks: 2 },
@@ -111,7 +111,7 @@ test.describe("Planner roadmap", () => {
     ]);
     cleanup.push(() => removeRoster(owner, roster.team.id));
     const workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
     const projects = await api<{ id: string; name: string }[]>(owner, "projects", {
       method: "POST", headers: { Prefer: "return=representation" },
       body: JSON.stringify(["Payments", "Search"].map(name => ({ workspace_id: workspace.id, name }))),

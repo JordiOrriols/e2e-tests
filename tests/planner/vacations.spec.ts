@@ -34,7 +34,7 @@ test.describe("Planner vacation calendar", () => {
     const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
       method: "POST", body: JSON.stringify({ workspace_name: workspaceName }),
     });
-    cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace!.id}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace!.id}`, { method: "DELETE" }));
     await api(owner, "rpc/planner_set_workspace_teams", {
       method: "POST", body: JSON.stringify({ workspace: workspace!.id, team_ids: [roster.team.id] }),
     });

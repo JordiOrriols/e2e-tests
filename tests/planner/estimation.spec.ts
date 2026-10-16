@@ -20,7 +20,7 @@ test.describe("Planner feature estimation", () => {
     const roster = await createRoster(owner, `Estimation ${randomUUID().slice(0, 8)}`);
     cleanup.push(() => removeRoster(owner, roster.team.id));
     workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
     const projects = await api<{ id: string; name: string }[]>(owner, "projects", {
       method: "POST", headers: { Prefer: "return=representation" },
       body: JSON.stringify(["Payments", "Search"].map(name => ({ workspace_id: workspace.id, name }))),

@@ -94,7 +94,7 @@ test("switching to Catalan translates every Planner page and persists after a re
     expect(await untranslated(page, english), "English text in the feature editor").toEqual([]);
   } finally {
     await context.close();
-    await api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" });
+    await api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" });
     await removeRoster(owner, roster.team.id);
   }
 });
