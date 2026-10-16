@@ -67,8 +67,9 @@ test.describe("Ladders password reset @password-reset", () => {
     );
     await page.getByTestId("login-email").fill("test@example.com");
     await page.getByTestId("login-submit").click();
+    // Supabase's rate-limit error is shown as Ladders' localized message.
     await expect(page.getByTestId("login-error")).toContainText(
-      "Email rate limit exceeded",
+      "Too many attempts. Please wait before trying again.",
     );
     await expect(page.getByTestId("login-submit")).toBeEnabled();
     await expect(page.getByTestId("login-info")).toHaveCount(0);
