@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import {
-  addFeatures, api, authenticatedPage, createRoster, removeRoster, seedRoadmap, selectWorkspace, signIn,
+  addFeatures, api, authenticatedPage, createRoster, createWorkspace, removeWorkspace, selectWorkspace, signIn,
   waitForWorkspace, type Account,
 } from "./planner-helpers";
 
@@ -24,10 +24,9 @@ test.describe("Planner workspace sharing", () => {
   test("the owner shares a workspace by email and changes or revokes its access", async ({ browser }) => {
     test.setTimeout(120_000);
     const collaborator = await signIn(true);
-    const roster = await createRoster(owner, `Shared ${randomUUID().slice(0, 8)}`);
-    cleanup.push(() => removeRoster(owner, roster.team.id));
-    const workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    const workspace = await createWorkspace(owner);
+    cleanup.push(() => removeWorkspace(owner, workspace.id));
+    await createRoster(owner, `Shared ${randomUUID().slice(0, 8)}`, undefined, workspace.id);
     await addFeatures(owner, workspace.id, [{ name: "Checkout", backend_devs: 1, backend_weeks: 1 }]);
 
     const ownerPage = (await authenticatedPage(browser, owner)).page;

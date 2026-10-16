@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import {
-  api, authenticatedPage, createRoster, removeRoster, seedRoadmap, selectWorkspace, signIn, type Account,
+  api, authenticatedPage, createRoster, createWorkspace, removeWorkspace, selectWorkspace, signIn, type Account,
 } from "./planner-helpers";
 
 /*
@@ -38,18 +38,13 @@ test.describe("Planner squad velocity", () => {
     owner = await signIn();
     const suffix = randomUUID().slice(0, 8);
     teams = [`Alpha ${suffix}`, `Beta ${suffix}`];
-    const alpha = await createRoster(owner, teams[0]!, [
+    workspace = await createWorkspace(owner);
+    cleanup.push(() => removeWorkspace(owner, workspace.id));
+    await createRoster(owner, teams[0]!, [
       { name: "Ada", planning_role: "backend" },
       { name: "Fran", planning_role: "frontend" },
-    ]);
-    cleanup.push(() => removeRoster(owner, alpha.team.id));
-    const beta = await createRoster(owner, teams[1]!, [{ name: "Dana", planning_role: "design" }]);
-    cleanup.push(() => removeRoster(owner, beta.team.id));
-    workspace = await seedRoadmap(owner, alpha.team.id, []);
-    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
-    await api(owner, "rpc/planner_set_workspace_teams", {
-      method: "POST", body: JSON.stringify({ workspace: workspace.id, team_ids: [alpha.team.id, beta.team.id] }),
-    });
+    ], workspace.id);
+    await createRoster(owner, teams[1]!, [{ name: "Dana", planning_role: "design" }], workspace.id);
     await api(owner, `workspaces?id=eq.${workspace.id}`, {
       method: "PATCH", body: JSON.stringify({ sprint_start_date: "2026-09-07" }),
     });

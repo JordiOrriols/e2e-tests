@@ -3,7 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
 import {
-  addFeatures, api, authenticatedPage, createRoster, removeRoster, seedRoadmap, selectWorkspace, signIn,
+  addFeatures, authenticatedPage, createRoster, createWorkspace, removeWorkspace, selectWorkspace, signIn,
   DATA_TIMEOUT,
 } from "./planner-helpers";
 
@@ -47,10 +47,10 @@ test("switching to Catalan translates every Planner page and persists after a re
   const owner = await signIn();
   const teamName = `Idioma ${randomUUID().slice(0, 8)}`;
   // Member names stay out of the English strings so they are not mistaken for UI text.
-  const roster = await createRoster(owner, teamName, [
+  const workspace = await createWorkspace(owner);
+  await createRoster(owner, teamName, [
     { name: "Núria", planning_role: "backend" }, { name: "Jordi", planning_role: "frontend" },
-  ]);
-  const workspace = await seedRoadmap(owner, roster.team.id, []);
+  ], workspace.id);
   await addFeatures(owner, workspace.id, [
     { name: "Pagament", backend_devs: 2, backend_weeks: 2, frontend_devs: 1, frontend_weeks: 2, priority: 0, in_backlog: true },
     { name: "Cercador", design_devs: 1, design_weeks: 1, qa_devs: 1, qa_weeks: 1, in_backlog: false },
@@ -77,7 +77,7 @@ test("switching to Catalan translates every Planner page and persists after a re
       { tab: "Estimació", ready: page.getByRole("article", { name: "Pagament" }) },
       { tab: "Full de ruta", ready: page.getByLabel(/Pagament$/).first() },
       { tab: "Vacances", ready: page.getByRole("region", { name: "Velocitat de l'equip" }) },
-      { tab: "Configuració de l'equip", ready: page.getByRole("checkbox", { name: teamName }) },
+      { tab: "Configuració de l'equip", ready: page.getByRole("region", { name: "Equips" }).getByText(teamName, { exact: true }) },
     ];
     for (const { tab, ready } of pages) {
       await tabs.getByRole("link", { name: tab, exact: true }).click();
@@ -94,7 +94,6 @@ test("switching to Catalan translates every Planner page and persists after a re
     expect(await untranslated(page, english), "English text in the feature editor").toEqual([]);
   } finally {
     await context.close();
-    await api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" });
-    await removeRoster(owner, roster.team.id);
+    await removeWorkspace(owner, workspace.id);
   }
 });

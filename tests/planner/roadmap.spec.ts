@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import {
-  addFeatures, api, authenticatedPage, createRoster, removeRoster, roadmapRowAction, seedRoadmap, selectWorkspace,
+  addFeatures, api, authenticatedPage, createRoster, createWorkspace, removeWorkspace, roadmapRowAction, selectWorkspace,
   setPlanStart, signIn, type Account,
 } from "./planner-helpers";
 
@@ -36,16 +36,15 @@ test.describe("Planner roadmap", () => {
 
   test("two backends and one frontend share the roadmap without idle overlap", async ({ browser }) => {
     test.setTimeout(90_000);
-    const roster = await createRoster(owner, `Roadmap squad ${randomUUID().slice(0, 8)}`, [
+    const workspace = await createWorkspace(owner);
+    cleanup.push(() => removeWorkspace(owner, workspace.id));
+    await createRoster(owner, `Roadmap squad ${randomUUID().slice(0, 8)}`, [
       { name: "Back", planning_role: "backend" },
       { name: "Back 2", planning_role: "backend" },
       { name: "Front", planning_role: "frontend" },
       { name: "Designer", planning_role: "design" },
       { name: "Quality", planning_role: "qa" },
-    ]);
-    cleanup.push(() => removeRoster(owner, roster.team.id));
-    const workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    ], workspace.id);
     await addFeatures(owner, workspace.id, [
       { name: "Back Task", backend_devs: 2, backend_weeks: 2 },
       { name: "1 Back Task Second", backend_devs: 1, backend_weeks: 2 },
@@ -106,12 +105,11 @@ test.describe("Planner roadmap", () => {
 
   test("rows reorder by drag and drop, are delivered from the context menu and group by main project", async ({ browser }) => {
     test.setTimeout(90_000);
-    const roster = await createRoster(owner, `Roadmap order ${randomUUID().slice(0, 8)}`, [
+    const workspace = await createWorkspace(owner);
+    cleanup.push(() => removeWorkspace(owner, workspace.id));
+    await createRoster(owner, `Roadmap order ${randomUUID().slice(0, 8)}`, [
       { name: "Back", planning_role: "backend" },
-    ]);
-    cleanup.push(() => removeRoster(owner, roster.team.id));
-    const workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
+    ], workspace.id);
     const projects = await api<{ id: string; name: string }[]>(owner, "projects", {
       method: "POST", headers: { Prefer: "return=representation" },
       body: JSON.stringify(["Payments", "Search"].map(name => ({ workspace_id: workspace.id, name }))),

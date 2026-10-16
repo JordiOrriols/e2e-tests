@@ -5,8 +5,8 @@ import {
   api,
   authenticatedPage,
   createRoster,
-  removeRoster,
-  seedRoadmap,
+  createWorkspace,
+  removeWorkspace,
   selectWorkspace,
   signIn,
   type Account,
@@ -30,14 +30,13 @@ test.describe("Planner feature estimation", () => {
   const cleanup: (() => Promise<unknown>)[] = [];
   test.beforeEach(async ({ browser }) => {
     owner = await signIn();
-    const roster = await createRoster(
+    workspace = await createWorkspace(owner);
+    cleanup.push(() => removeWorkspace(owner, workspace.id));
+    await createRoster(
       owner,
       `Estimation ${randomUUID().slice(0, 8)}`,
-    );
-    cleanup.push(() => removeRoster(owner, roster.team.id));
-    workspace = await seedRoadmap(owner, roster.team.id, []);
-    cleanup.push(() =>
-      api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" }),
+      undefined,
+      workspace.id,
     );
     const projects = await api<{ id: string; name: string }[]>(
       owner,

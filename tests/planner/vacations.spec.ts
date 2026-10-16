@@ -1,7 +1,7 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import {
-  PLANNER_URL, api, authenticatedPage, calendarDay, createRoster, removeRoster, selectWorkspace, setAvailability,
+  PLANNER_URL, api, authenticatedPage, calendarDay, createRoster, createWorkspace, removeWorkspace, selectWorkspace, setAvailability,
   showMonth, signIn, vacationBadge, type Account,
 } from "./planner-helpers";
 
@@ -16,12 +16,14 @@ const days = (from: number, to: number) =>
 test.describe("Planner vacation calendar", () => {
   let owner: Account;
   let roster: Awaited<ReturnType<typeof createRoster>>;
+  let workspace: Awaited<ReturnType<typeof createWorkspace>>;
   const contexts: BrowserContext[] = [];
   const cleanup: (() => Promise<unknown>)[] = [];
   test.beforeEach(async () => {
     owner = await signIn();
-    roster = await createRoster(owner, `Vacations ${randomUUID().slice(0, 8)}`);
-    cleanup.push(() => removeRoster(owner, roster.team.id));
+    workspace = await createWorkspace(owner, `Vacations ${randomUUID().slice(0, 8)}`);
+    cleanup.push(() => removeWorkspace(owner, workspace.id));
+    roster = await createRoster(owner, `Vacations ${randomUUID().slice(0, 8)}`, undefined, workspace.id);
   });
   test.afterEach(async () => {
     for (const context of contexts.splice(0)) await context.close();
@@ -30,14 +32,6 @@ test.describe("Planner vacation calendar", () => {
 
   test("a selected range stays on the calendar and Working Day only removes vacations", async ({ browser }) => {
     test.setTimeout(90_000);
-    const workspaceName = `Vacations ${randomUUID().slice(0, 8)}`;
-    const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
-      method: "POST", body: JSON.stringify({ workspace_name: workspaceName }),
-    });
-    cleanup.push(() => api(owner, `workspaces?id=eq.${workspace!.id}`, { method: "DELETE" }));
-    await api(owner, "rpc/planner_set_workspace_teams", {
-      method: "POST", body: JSON.stringify({ workspace: workspace!.id, team_ids: [roster.team.id] }),
-    });
     // A day explicitly marked as worked (a working Saturday) must survive clearing the vacations around it.
     await api(owner, "vacations", {
       method: "POST", body: JSON.stringify({ member_id: roster.ownerMember.id, date: "2026-10-10", is_working: true }),
@@ -45,7 +39,7 @@ test.describe("Planner vacation calendar", () => {
     const opened = await authenticatedPage(browser, owner);
     contexts.push(opened.context);
     const page = opened.page;
-    await selectWorkspace(page, workspaceName);
+    await selectWorkspace(page, workspace.name);
     await page.getByRole("link", { name: "Vacations", exact: true }).click();
     await page.getByLabel("Member", { exact: true }).selectOption(roster.ownerMember.id);
 

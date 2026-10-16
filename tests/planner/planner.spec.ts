@@ -2,12 +2,12 @@ import { test, expect, type BrowserContext } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import { expectNoAnalytics } from "../../utils";
 import {
-  api, authenticatedPage, calendarDay, createRoster, removeRoster, roadmapRowAction, selectWorkspace,
+  api, authenticatedPage, calendarDay, createRoster, createWorkspace, removeWorkspace, roadmapRowAction, selectWorkspace,
   setAvailability, setPlanStart, showMonth, signIn, vacationBadge,
 } from "./planner-helpers";
 
 
-test("estimates, priority scheduling, linked Ladders teams and token vacations persist through Supabase", async ({ browser }) => {
+test("estimates, priority scheduling, workspace teams and token vacations persist through Supabase", async ({ browser }) => {
   test.setTimeout(120_000);
   const owner = await signIn();
   const collaborator = await signIn(true);
@@ -19,7 +19,7 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
       runtimeErrors.push(message.text());
   });
   const workspaceName = `Planner E2E ${randomUUID().slice(0, 8)}`;
-  const roster = await createRoster(owner, workspaceName);
+  let roster!: Awaited<ReturnType<typeof createRoster>>;
   let workspaceId: string | undefined;
   let secondContext: BrowserContext | undefined;
   try {
@@ -34,9 +34,15 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     const workspaces = await api<{ id: string }[]>(owner, `workspaces?name=eq.${encodeURIComponent(workspaceName)}&created_for_team=is.false&select=id`);
     workspaceId = workspaces?.[0]?.id;
     if (!workspaceId) throw new Error("Test workspace was not persisted");
+    roster = await createRoster(owner, workspaceName, undefined, workspaceId);
     await page.getByRole("link", { name: "Team configuration", exact: true }).click();
-    await page.getByRole("checkbox", { name: workspaceName, exact: true }).check();
-    await page.getByRole("button", { name: "Save linked teams" }).click();
+    // The owner adds a team straight into this workspace; adding it reloads the roster too.
+    const teams = page.getByRole("region", { name: "Teams", exact: true });
+    await expect(teams.getByRole("checkbox")).toHaveCount(0);
+    await teams.getByRole("textbox", { name: "New team name" }).fill(`Platform ${workspaceName}`);
+    await teams.getByRole("button", { name: "Add team", exact: true }).click();
+    await expect(teams.getByText(`Platform ${workspaceName}`, { exact: true })).toBeVisible();
+    await expect(teams.getByText(workspaceName, { exact: true })).toBeVisible();
     await expect(page.getByLabel("Planning role for Owner")).toHaveValue("backend");
     await page.getByRole("link", { name: "Estimation", exact: true }).click();
 
@@ -175,8 +181,7 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
       const rows = await api<{ id: string }[]>(owner, `workspaces?name=eq.${encodeURIComponent(workspaceName)}&created_for_team=is.false&select=id`);
       workspaceId = rows?.[0]?.id;
     }
-    if (workspaceId) await api(owner, `workspaces?id=eq.${workspaceId}`, { method: "DELETE" });
-    await removeRoster(owner, roster.team.id);
+    if (workspaceId) await removeWorkspace(owner, workspaceId);
     await secondContext?.close();
     await context.close();
   }
@@ -184,19 +189,11 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
 
 test("roadmap priorities can be reordered and different roles run in parallel", async ({ browser }) => {
   const owner = await signIn();
-  const roster = await createRoster(owner, `Planner order team ${randomUUID().slice(0, 8)}`);
   const workspaceName = `Planner order ${randomUUID().slice(0, 8)}`;
-  const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
-    method: "POST",
-    body: JSON.stringify({ workspace_name: workspaceName }),
-  });
-  if (!workspace) throw new Error("Workspace creation did not return a row");
+  const workspace = await createWorkspace(owner, workspaceName);
   let context: BrowserContext | undefined;
   try {
-    await api(owner, "rpc/planner_set_workspace_teams", {
-      method: "POST",
-      body: JSON.stringify({ workspace: workspace.id, team_ids: [roster.team.id] }),
-    });
+    await createRoster(owner, `Planner order team ${randomUUID().slice(0, 8)}`, undefined, workspace.id);
     await api(owner, "features", {
       method: "POST",
       body: JSON.stringify(["First", "Second"].map((name, index) => ({
@@ -230,8 +227,7 @@ test("roadmap priorities can be reordered and different roles run in parallel", 
     await page.getByRole("link", { name: "Roadmap", exact: true }).click();
     await expect(page.getByLabel("Feature schedule")).toContainText("No Backend capacity");
   } finally {
-    await api(owner, `workspaces?id=eq.${workspace.id}`, { method: "DELETE" });
-    await removeRoster(owner, roster.team.id);
+    await removeWorkspace(owner, workspace.id);
     await context?.close();
   }
 });
@@ -259,53 +255,31 @@ test("anonymous shared login exposes recovery and delegates it without sending r
   expect(recoveries).toBe(1);
 });
 
-test("Ladders shares a personal vacation link and its leave follows the teams into the plan they move to", async ({ browser }) => {
+test("Ladders shares a personal vacation link and its leave shapes the plan of the team's workspace", async ({ browser }) => {
   test.setTimeout(90_000);
   const owner = await signIn();
   const suffix = randomUUID().slice(0, 8);
-  const roster = await createRoster(owner, `Shared roster ${suffix}`);
-  const workspaces: string[] = [];
-  let extraTeam: string | undefined;
+  const workspace = await createWorkspace(owner, `Shared plan ${suffix}`);
   let context: BrowserContext | undefined;
   let anonymous: BrowserContext | undefined;
   try {
-    const extra = await api<{ id: string }>(owner, "rpc/create_team", {
-      method: "POST", body: JSON.stringify({ p_name: `Design roster ${suffix}` }),
+    const roster = await createRoster(owner, `Shared roster ${suffix}`, undefined, workspace.id);
+    await createRoster(owner, `Design roster ${suffix}`, [{ name: "Grace", planning_role: "design" }], workspace.id);
+    await api(owner, "features", {
+      method: "POST", body: JSON.stringify({
+        workspace_id: workspace.id, name: "Shared checkout", in_backlog: true,
+        backend_devs: 1, backend_weeks: 1,
+      }),
     });
-    if (!extra) throw new Error("Second team creation returned no row");
-    extraTeam = extra.id;
-    await api(owner, "members", {
-      method: "POST", body: JSON.stringify({ team_id: extra.id, name: "Grace", planning_role: "design" }),
-    });
-    for (const name of ["First plan", "Second plan"]) {
-      const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
-        method: "POST", body: JSON.stringify({ workspace_name: `${name} ${suffix}` }),
-      });
-      if (!workspace) throw new Error("Shared plan creation returned no row");
-      workspaces.push(workspace.id);
-      await api(owner, "features", {
-        method: "POST", body: JSON.stringify({
-          workspace_id: workspace.id, name: "Shared checkout", in_backlog: true,
-          backend_devs: 1, backend_weeks: 1,
-        }),
-      });
-    }
     const opened = await authenticatedPage(browser, owner);
     context = opened.context;
     const page = opened.page;
-    await selectWorkspace(page, `First plan ${suffix}`);
+    await selectWorkspace(page, workspace.name);
     await page.getByRole("link", { name: "Team configuration", exact: true }).click();
-    await page.getByRole("checkbox", { name: `Shared roster ${suffix}`, exact: true }).check();
-    await page.getByRole("checkbox", { name: `Design roster ${suffix}`, exact: true }).check();
-    await page.getByRole("button", { name: "Save linked teams", exact: true }).click();
+    const teams = page.getByRole("region", { name: "Teams", exact: true });
+    await expect(teams.getByText(`Shared roster ${suffix}`, { exact: true })).toBeVisible();
+    await expect(teams.getByText(`Design roster ${suffix}`, { exact: true })).toBeVisible();
     await expect(page.getByLabel("Planning role for Grace", { exact: true })).toHaveValue("design");
-    // A team lives in one workspace, so moving both teams into the second plan empties the first.
-    await api(owner, "rpc/planner_set_workspace_teams", {
-      method: "POST", body: JSON.stringify({ workspace: workspaces[1], team_ids: [roster.team.id, extra.id] }),
-    });
-    expect(await api(owner, "rpc/planner_workspace_roster", {
-      method: "POST", body: JSON.stringify({ workspace: workspaces[0] }),
-    })).toEqual([]);
 
     const laddersPage = await context.newPage();
     const laddersURL = new URL(process.env.LADDERS_LOCAL_URL ?? "http://localhost:5175");
@@ -339,16 +313,14 @@ test("Ladders shares a personal vacation link and its leave follows the teams in
     await expect(vacationBadge(vacationPage, "2026-10-05", "Owner")).toBeVisible();
     expect(await vacationPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
     await page.reload();
-    await selectWorkspace(page, `Second plan ${suffix}`);
+    await selectWorkspace(page, workspace.name);
     await page.getByRole("link", { name: "Roadmap", exact: true }).click();
     await setPlanStart(page, "2026-10-05");
     await expect(page.getByLabel("Shared checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
     const availability = await api<{ member_id: string; date: string }[]>(owner, `vacations?member_id=eq.${roster.ownerMember.id}&select=member_id,date`);
     expect(availability).toHaveLength(2);
   } finally {
-    for (const workspace of workspaces) await api(owner, `workspaces?id=eq.${workspace}`, { method: "DELETE" });
-    if (extraTeam) await removeRoster(owner, extraTeam);
-    await removeRoster(owner, roster.team.id);
+    await removeWorkspace(owner, workspace.id);
     await anonymous?.close();
     await context?.close();
   }

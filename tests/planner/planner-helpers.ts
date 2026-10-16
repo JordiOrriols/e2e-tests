@@ -53,10 +53,13 @@ const DEFAULT_ROSTER: RosterMember[] = [
   { name: "Frontend", role: "Frontend Engineer", planning_role: "frontend" },
 ];
 
-/** A Ladders team with members; the first member is returned as `ownerMember`. */
-export async function createRoster(account: Account, name: string, people: RosterMember[] = DEFAULT_ROSTER) {
+/**
+ * A Ladders team with members; the first member is returned as `ownerMember`. Teams stay in the
+ * workspace they are created in: pass one to plan with the team, or it gets a workspace of its own.
+ */
+export async function createRoster(account: Account, name: string, people: RosterMember[] = DEFAULT_ROSTER, workspace?: string) {
   const team = await api<{ id: string }>(account, "rpc/create_team", {
-    method: "POST", body: JSON.stringify({ p_name: name }),
+    method: "POST", body: JSON.stringify(workspace ? { p_name: name, p_workspace: workspace } : { p_name: name }),
   });
   if (!team) throw new Error("Ladders team creation returned no row");
   try {
@@ -127,17 +130,18 @@ export type Feature = { name: string } & Partial<Record<
 
 const ROLE_FIELDS = ["backend", "frontend", "design", "qa"].flatMap(role => [`${role}_devs`, `${role}_weeks`]);
 
-/** A linked workspace whose roadmap holds `features` in the given priority order. */
-export async function seedRoadmap(owner: Account, teamId: string, features: Feature[]) {
-  const workspaceName = `Roadmap ${randomUUID().slice(0, 8)}`;
-  const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
-    method: "POST", body: JSON.stringify({ workspace_name: workspaceName }),
+export async function createWorkspace(owner: Account, name = `Roadmap ${randomUUID().slice(0, 8)}`) {
+  const workspace = await api<{ id: string; name: string }>(owner, "rpc/create_workspace", {
+    method: "POST", body: JSON.stringify({ workspace_name: name }),
   });
   if (!workspace) throw new Error("Workspace creation did not return a row");
-  await api(owner, "rpc/planner_set_workspace_teams", {
-    method: "POST", body: JSON.stringify({ workspace: workspace.id, team_ids: [teamId] }),
-  });
-  return { id: workspace.id, name: workspaceName };
+  return { id: workspace.id, name: workspace.name };
+}
+/** A workspace keeps its teams, so delete them before the workspace itself. */
+export async function removeWorkspace(owner: Account, workspace: string) {
+  const teams = await api<{ id: string }[]>(owner, `teams?workspace_id=eq.${workspace}&select=id`);
+  for (const team of teams ?? []) await removeRoster(owner, team.id);
+  await api(owner, `workspaces?id=eq.${workspace}`, { method: "DELETE" });
 }
 export async function addFeatures(owner: Account, workspaceId: string, features: Feature[]) {
   await api(owner, "features", {
