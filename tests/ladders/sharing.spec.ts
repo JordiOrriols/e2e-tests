@@ -1,10 +1,11 @@
-import { test, expect, seedTeam } from "./fixtures";
+import { test, expect, seedSharedTeam } from "./fixtures";
 import { LaddersApp, uniqueName } from "./ladders-app";
 import type { LaddersData } from "../../scripts/ladders-data";
 import { hasSecondAccount } from "../../scripts/ladders-auth";
 
 /**
- * Team sharing between two real users.
+ * Workspace sharing between two real users. A team's access comes from the
+ * share of the workspace it lives in.
  *
  * The owner side runs on its own: sharing, changing a permission and removing a
  * collaborator are all owner actions. The collaborator side needs the second
@@ -24,15 +25,40 @@ const SKIP_REASON =
 
 const SHARE_TIMEOUT = 8_000;
 
-test.describe("Ladders team sharing", () => {
-  test("shares a team with an email", async ({ page, data }) => {
+test.describe("Ladders workspace sharing", () => {
+  test("lists only the selected workspace's teams and shares from the tab bar", async ({
+    page,
+    data,
+    defaultTeamName,
+  }) => {
     const app = new LaddersApp(page);
-    const teamName = uniqueName("E2E Shared");
-    const email = SECOND_ACCOUNT ?? STRANGER_EMAIL;
-    const team = await seedTeam(data, teamName);
+    const { team, workspace } = await seedSharedTeam(
+      data,
+      uniqueName("E2E Shared"),
+    );
 
     await app.gotoHome();
-    await app.openShareDialog(teamName);
+    await app.openTeamTab();
+    await expect(app.teamSectionByName(defaultTeamName)).toBeVisible();
+    await expect(app.teamSectionByName(team.name)).toHaveCount(0);
+    // Sharing lives next to the tabs for the whole workspace, never per team.
+    await expect(page.getByTestId("team-share-open")).toHaveCount(0);
+    await expect(
+      page.getByTestId("main-tabs").getByTestId("workspace-share"),
+    ).toBeVisible();
+
+    await app.selectWorkspace(workspace.name);
+    await expect(app.teamSectionByName(team.name)).toBeVisible();
+    await expect(app.teamSectionByName(defaultTeamName)).toHaveCount(0);
+  });
+
+  test("shares a workspace with an email", async ({ page, data }) => {
+    const app = new LaddersApp(page);
+    const email = SECOND_ACCOUNT ?? STRANGER_EMAIL;
+    const { workspace } = await seedSharedTeam(data, uniqueName("E2E Shared"));
+
+    await app.gotoHome();
+    await app.openShareDialog(workspace.name);
     await app.share(email, "viewer");
 
     await app.waitForShareRow(email);
@@ -40,12 +66,14 @@ test.describe("Ladders team sharing", () => {
     // backend refused would still render if the app ignored the error.
     await expect
       .poll(
-        async () => (await data.listShares(team.id)).map((s) => s.access_level),
-        {
-          timeout: SHARE_TIMEOUT,
-        },
+        async () =>
+          (await data.listShares(workspace.id)).map((s) => [
+            s.app,
+            s.access_level,
+          ]),
+        { timeout: SHARE_TIMEOUT },
       )
-      .toEqual(["viewer"]);
+      .toEqual([["ladders", "viewer"]]);
   });
 
   test("raises a collaborator from viewer to editor", async ({
@@ -53,44 +81,45 @@ test.describe("Ladders team sharing", () => {
     data,
   }) => {
     const app = new LaddersApp(page);
-    const teamName = uniqueName("E2E Shared");
     const email = SECOND_ACCOUNT ?? STRANGER_EMAIL;
-    const team = await seedTeam(data, teamName);
-    await data.shareTeam(team.id, email, "viewer");
+    const { workspace } = await seedSharedTeam(data, uniqueName("E2E Shared"), {
+      email,
+      access: "viewer",
+    });
 
     await app.gotoHome();
-    await app.openShareDialog(teamName);
+    await app.openShareDialog(workspace.name);
     await app.waitForShareRow(email);
     await app.changeShareAccess(email, "editor");
 
     await expect
       .poll(
-        async () => (await data.listShares(team.id)).map((s) => s.access_level),
-        {
-          timeout: SHARE_TIMEOUT,
-        },
+        async () =>
+          (await data.listShares(workspace.id)).map((s) => s.access_level),
+        { timeout: SHARE_TIMEOUT },
       )
       .toEqual(["editor"]);
-    await expect(
-      app.shareRow(email).getByTestId("share-row-access"),
-    ).toHaveValue("editor");
+    await expect(app.shareAccess(email)).toHaveValue("editor");
   });
 
   test("removes a collaborator", async ({ page, data }) => {
     const app = new LaddersApp(page);
-    const teamName = uniqueName("E2E Shared");
     const email = SECOND_ACCOUNT ?? STRANGER_EMAIL;
-    const team = await seedTeam(data, teamName);
-    await data.shareTeam(team.id, email, "editor");
+    const { workspace } = await seedSharedTeam(data, uniqueName("E2E Shared"), {
+      email,
+      access: "editor",
+    });
 
     await app.gotoHome();
-    await app.openShareDialog(teamName);
+    await app.openShareDialog(workspace.name);
     await app.waitForShareRow(email);
     await app.removeShare(email);
 
     await expect(app.shareRow(email)).toHaveCount(0);
     await expect
-      .poll(async () => data.listShares(team.id), { timeout: SHARE_TIMEOUT })
+      .poll(async () => data.listShares(workspace.id), {
+        timeout: SHARE_TIMEOUT,
+      })
       .toEqual([]);
   });
 
@@ -99,11 +128,10 @@ test.describe("Ladders team sharing", () => {
     data,
   }) => {
     const app = new LaddersApp(page);
-    const teamName = uniqueName("E2E Shared");
-    await seedTeam(data, teamName);
+    const { workspace } = await seedSharedTeam(data, uniqueName("E2E Shared"));
 
     await app.gotoHome();
-    await app.openShareDialog(teamName);
+    await app.openShareDialog(workspace.name);
     await app.share(STRANGER_EMAIL, "viewer");
 
     // The reason belongs on the collaborator row, so nothing is added.
@@ -111,29 +139,35 @@ test.describe("Ladders team sharing", () => {
     await expect(app.shareRow(STRANGER_EMAIL)).toHaveCount(0);
   });
 
-  test("refuses to share a team with yourself", async ({ page, data }) => {
+  test("refuses to share a workspace with yourself", async ({ page, data }) => {
     const app = new LaddersApp(page);
-    const teamName = uniqueName("E2E Shared");
-    await seedTeam(data, teamName);
+    const { workspace } = await seedSharedTeam(data, uniqueName("E2E Shared"));
 
     await app.gotoHome();
-    await app.openShareDialog(teamName);
+    await app.openShareDialog(workspace.name);
     await app.share(OWNER_EMAIL ?? "", "viewer");
 
     await expect(app.shareError).toBeVisible();
   });
 });
 
-test.describe("Ladders shared team as a collaborator", () => {
+test.describe("Ladders shared workspace as a collaborator", () => {
   test.beforeEach(() => {
     test.skip(!hasSecondAccount(), SKIP_REASON);
   });
 
-  /** Seeds a team and shares it with the collaborator at the given level. */
+  /** Seeds a team in its own workspace, shared with the collaborator. */
   async function shareTeamWith(data: LaddersData, access: "viewer" | "editor") {
-    const team = await seedTeam(data, uniqueName("E2E Shared"));
-    await data.shareTeam(team.id, SECOND_ACCOUNT!, access);
-    return team;
+    const { team, workspace } = await seedSharedTeam(
+      data,
+      uniqueName("E2E Shared"),
+      { email: SECOND_ACCOUNT!, access },
+    );
+    return {
+      ...team,
+      workspaceName: workspace.name,
+      workspaceId: workspace.id,
+    };
   }
 
   test("a viewer sees the team but cannot add members", async ({
@@ -144,6 +178,7 @@ test.describe("Ladders shared team as a collaborator", () => {
     const app = new LaddersApp(collaborator.page);
 
     await app.gotoHome();
+    await app.selectWorkspace(team.workspaceName);
     await collaborator.page.getByTestId("tab-team").click();
 
     const section = app.teamSectionByName(team.name);
@@ -155,7 +190,9 @@ test.describe("Ladders shared team as a collaborator", () => {
     );
     // Owner only actions are not offered to a collaborator at all.
     await expect(section.getByTestId("add-member-button")).toHaveCount(0);
-    await expect(section.getByTestId("team-share-open")).toHaveCount(0);
+    await expect(collaborator.page.getByTestId("workspace-share")).toHaveCount(
+      0,
+    );
     await expect(section.getByTestId("team-rename-open")).toHaveCount(0);
   });
 
@@ -173,6 +210,7 @@ test.describe("Ladders shared team as a collaborator", () => {
 
     const app = new LaddersApp(collaborator.page);
     await app.gotoHome();
+    await app.selectWorkspace(team.workspaceName);
     await collaborator.page.getByTestId("tab-team").click();
 
     await expect(
@@ -194,6 +232,7 @@ test.describe("Ladders shared team as a collaborator", () => {
 
     const app = new LaddersApp(collaborator.page);
     await app.gotoHome();
+    await app.selectWorkspace(team.workspaceName);
     await collaborator.page.getByTestId("tab-team").click();
 
     const card = collaborator.page.getByTestId(`member-card-${member.id}`);
@@ -251,6 +290,7 @@ test.describe("Ladders shared team as a collaborator", () => {
     const app = new LaddersApp(collaborator.page);
 
     await app.gotoHome();
+    await app.selectWorkspace(team.workspaceName);
     await collaborator.page.getByTestId("tab-team").click();
     const section = app.teamSectionByName(team.name);
     await expect(section.getByTestId(`team-access-${team.id}`)).toHaveAttribute(
@@ -297,16 +337,23 @@ test.describe("Ladders shared team as a collaborator", () => {
     const app = new LaddersApp(collaborator.page);
 
     await app.gotoHome();
+    await app.selectWorkspace(team.workspaceName);
     await collaborator.page.getByTestId("tab-team").click();
     await expect(app.teamSectionByName(team.name)).toBeVisible();
 
-    const [share] = await data.listShares(team.id);
-    await data.removeShare(team.id, share.user_id);
+    const [share] = await data.listShares(team.workspaceId);
+    await data.removeShare(team.workspaceId, share.user_id);
 
     // A reload is the honest way to observe it: the collaborator has to reload
     // to find out, so that is what the app is allowed to make them do.
     await collaborator.page.reload();
     await collaborator.page.getByTestId("tab-team").click();
     await expect(app.teamSectionByName(team.name)).toHaveCount(0);
+    await app.workspaceSwitcher.click();
+    await expect(
+      collaborator.page.getByRole("menuitemradio", {
+        name: team.workspaceName,
+      }),
+    ).toHaveCount(0);
   });
 });

@@ -1,4 +1,4 @@
-import { expect, seedMember, seedTeam, test } from "./fixtures";
+import { expect, seedMember, seedSharedTeam, test } from "./fixtures";
 import { LaddersApp, uniqueName } from "./ladders-app";
 import { hasSecondAccount } from "../../scripts/ladders-auth";
 import type { LaddersData } from "../../scripts/ladders-data";
@@ -161,9 +161,13 @@ test.describe("Ladders goal comments @goals", () => {
       data,
       collaboratorData,
     }) => {
-      // Each test shares its own team: sharing the default team as viewer and
+      // Each test shares its own workspace: sharing the main one as viewer and
       // as editor from two parallel tests would race on the same grant.
-      const team = await seedTeam(data, uniqueName("E2E SharedGoal team"));
+      const { team } = await seedSharedTeam(
+        data,
+        uniqueName("E2E SharedGoal team"),
+        { email: SECOND_ACCOUNT!, access: "viewer" },
+      );
       const member = await data.createMember({
         name: uniqueName("E2E SharedGoal"),
         role: "Seeded role",
@@ -173,7 +177,6 @@ test.describe("Ladders goal comments @goals", () => {
         memberId: member.id,
         title: uniqueName("E2E SharedDiscussed"),
       });
-      await data.shareTeam(team.id, SECOND_ACCOUNT!, "viewer");
 
       // A viewer may read the goal but not join the conversation in it.
       await expect(
@@ -186,9 +189,13 @@ test.describe("Ladders goal comments @goals", () => {
       data,
       collaboratorData,
     }) => {
-      // Each test shares its own team: sharing the default team as viewer and
+      // Each test shares its own workspace: sharing the main one as viewer and
       // as editor from two parallel tests would race on the same grant.
-      const team = await seedTeam(data, uniqueName("E2E SharedGoalEdit team"));
+      const { team } = await seedSharedTeam(
+        data,
+        uniqueName("E2E SharedGoalEdit team"),
+        { email: SECOND_ACCOUNT!, access: "editor" },
+      );
       const member = await data.createMember({
         name: uniqueName("E2E SharedGoalEdit"),
         role: "Seeded role",
@@ -198,7 +205,6 @@ test.describe("Ladders goal comments @goals", () => {
         memberId: member.id,
         title: uniqueName("E2E SharedEdited"),
       });
-      await data.shareTeam(team.id, SECOND_ACCOUNT!, "editor");
       const said = uniqueName("E2E EditorSays");
 
       await collaboratorData.appendGoalComment(goal.id, said);

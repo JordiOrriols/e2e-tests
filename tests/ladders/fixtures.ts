@@ -27,6 +27,9 @@ import { LaddersApp, waitForData } from "./ladders-app";
  */
 export const DATA_TIMEOUT = 8_000;
 
+/** localStorage key where the shared WorkspaceBar remembers the selection. */
+const WORKSPACE_KEY = "ladders.workspace";
+
 export type Seeded = {
   member: Awaited<ReturnType<LaddersData["createMember"]>>;
   team: Awaited<ReturnType<LaddersData["createTeam"]>>;
@@ -61,6 +64,21 @@ export const test = base.extend<{
   collaborator: CollaboratorSession;
   collaboratorData: LaddersData;
 }>({
+  /**
+   * The app opens the remembered workspace, else the first by name. Test
+   * workspaces created in parallel ("E2E ...") sort before the main one, so the
+   * owner page remembers the main workspace unless a test picks another.
+   */
+  page: async ({ page, data }, use) => {
+    await page.addInitScript(
+      ([key, id]) => {
+        if (!localStorage.getItem(key)) localStorage.setItem(key, id);
+      },
+      [WORKSPACE_KEY, await data.mainWorkspace()] as const,
+    );
+    await use(page);
+  },
+
   data: async ({}, use) => {
     const data = new LaddersData();
     await use(data);
@@ -134,9 +152,25 @@ export async function seedMember(
   return data.createMember({ name, role, teamId: team?.id ?? null });
 }
 
-/** Seeds an extra team owned by the test user. */
+/** Seeds an extra team owned by the test user, in its main workspace. */
 export async function seedTeam(data: LaddersData, name: string) {
   return data.createTeam(name);
+}
+
+/**
+ * Seeds a team in its own workspace and, when given an email, shares that
+ * workspace with it. Sharing is per workspace, so each test gets its own to
+ * keep parallel tests from racing on the same grant.
+ */
+export async function seedSharedTeam(
+  data: LaddersData,
+  name: string,
+  share?: { email: string; access: "viewer" | "editor" },
+) {
+  const workspace = await data.createWorkspace(name);
+  const team = await data.createTeam(name, workspace.id);
+  if (share) await data.shareWorkspace(workspace.id, share.email, share.access);
+  return { team, workspace };
 }
 
 export { expect };

@@ -73,15 +73,32 @@ export type MemberRow = {
   template_id: string | null;
 };
 
-export type TeamRow = { id: string; name: string; is_default: boolean };
+export type TeamRow = {
+  id: string;
+  name: string;
+  is_default: boolean;
+  owner_id: string;
+  workspace_id: string;
+};
 
-export type TeamShareRow = {
-  team_id: string;
+export type WorkspaceRow = { id: string; name: string };
+
+export type WorkspaceShareRow = {
   user_id: string;
   email: string;
+  app: string;
   access_level: "viewer" | "editor";
-  shared_at: string;
 };
+
+/** The account a Supabase access token belongs to (the JWT subject). */
+function tokenSubject(token: string): string {
+  const payload = token.split(".")[1] ?? "";
+  return (
+    JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as {
+      sub: string;
+    }
+  ).sub;
+}
 
 export type EvaluationRow = {
   id: string;
@@ -129,6 +146,8 @@ export class LaddersData {
   private readonly createdMembers = new Set<string>();
   private readonly createdTeams = new Set<string>();
   private readonly createdEvaluations = new Set<string>();
+  private readonly createdWorkspaces = new Set<string>();
+  private mainWorkspaceId: Promise<string> | null = null;
 
   constructor(statePath?: string) {
     const s = session(statePath);
@@ -210,16 +229,34 @@ export class LaddersData {
   }
 
   /**
-   * Teams are created through the create_team RPC.
+   * The workspace holding this account's default team, which is the one the
+   * app opens (fixtures pin it, so other test workspaces cannot take its place).
+   */
+  mainWorkspace(): Promise<string> {
+    this.mainWorkspaceId ??= this.request<TeamRow[]>(
+      `teams?is_default=eq.true&owner_id=eq.${tokenSubject(this.token)}&select=*`,
+    ).then((rows) => {
+      if (!rows[0]) throw new Error("The test account has no default team");
+      return rows[0].workspace_id;
+    });
+    return this.mainWorkspaceId;
+  }
+
+  /**
+   * Teams are created through the create_team RPC, inside a workspace the
+   * caller owns (the main one unless told otherwise).
    *
    * A direct insert trips the RLS check because the row level policy compares
    * owner_id against auth.uid() before the column default is applied. The RPC is
    * security definer and is the path the app itself uses.
    */
-  async createTeam(name: string) {
+  async createTeam(name: string, workspaceId?: string) {
     const team = await this.request<TeamRow>("rpc/create_team", {
       method: "POST",
-      body: JSON.stringify({ p_name: name }),
+      body: JSON.stringify({
+        p_name: name,
+        p_workspace: workspaceId ?? (await this.mainWorkspace()),
+      }),
     });
     this.createdTeams.add(team.id);
     return team;
@@ -236,41 +273,60 @@ export class LaddersData {
     await this.request(`teams?id=eq.${id}`, { method: "DELETE" });
   }
 
-  /* Team sharing */
+  /* Workspaces and sharing: team access comes from the workspace share. */
 
-  listShares(teamId: string): Promise<TeamShareRow[]> {
-    return this.request<TeamShareRow[]>("rpc/list_team_shares", {
+  async createWorkspace(name: string): Promise<WorkspaceRow> {
+    const workspace = await this.request<WorkspaceRow>("rpc/create_workspace", {
       method: "POST",
-      body: JSON.stringify({ p_team_id: teamId }),
+      body: JSON.stringify({ workspace_name: name }),
+    });
+    this.createdWorkspaces.add(workspace.id);
+    return workspace;
+  }
+
+  /** Registers a workspace created through the UI so cleanup removes it too. */
+  trackWorkspace(workspace: { id: string }): void {
+    this.createdWorkspaces.add(workspace.id);
+  }
+
+  listWorkspaces(): Promise<(WorkspaceRow & { access_level: string })[]> {
+    return this.request("rpc/list_workspaces", {
+      method: "POST",
+      body: JSON.stringify({ app_name: "ladders" }),
     });
   }
 
-  shareTeam(teamId: string, email: string, access: "viewer" | "editor") {
-    return this.request("rpc/share_team_by_email", {
+  listShares(workspaceId: string): Promise<WorkspaceShareRow[]> {
+    return this.request<WorkspaceShareRow[]>("rpc/list_workspace_shares", {
+      method: "POST",
+      body: JSON.stringify({ workspace: workspaceId }),
+    });
+  }
+
+  shareWorkspace(
+    workspaceId: string,
+    email: string,
+    access: "viewer" | "editor",
+  ) {
+    return this.request("rpc/share_workspace", {
       method: "POST",
       body: JSON.stringify({
-        p_team_id: teamId,
-        p_email: email,
-        p_access: access,
+        workspace: workspaceId,
+        account_email: email,
+        app_name: "ladders",
+        access,
       }),
     });
   }
 
-  updateShare(teamId: string, userId: string, access: "viewer" | "editor") {
-    return this.request("rpc/update_team_share", {
+  removeShare(workspaceId: string, userId: string) {
+    return this.request("rpc/remove_workspace_share", {
       method: "POST",
       body: JSON.stringify({
-        p_team_id: teamId,
-        p_user_id: userId,
-        p_access: access,
+        workspace: workspaceId,
+        account: userId,
+        app_name: "ladders",
       }),
-    });
-  }
-
-  removeShare(teamId: string, userId: string) {
-    return this.request("rpc/remove_team_share", {
-      method: "POST",
-      body: JSON.stringify({ p_team_id: teamId, p_user_id: userId }),
     });
   }
 
@@ -466,8 +522,17 @@ export class LaddersData {
         failures.push(`team ${id}: ${describe(error)}`);
       }
     }
+    // A workspace can only go once its teams are gone.
+    for (const id of this.createdWorkspaces) {
+      try {
+        await this.request(`workspaces?id=eq.${id}`, { method: "DELETE" });
+      } catch (error) {
+        failures.push(`workspace ${id}: ${describe(error)}`);
+      }
+    }
     this.createdMembers.clear();
     this.createdTeams.clear();
+    this.createdWorkspaces.clear();
     this.createdEvaluations.clear();
     if (failures.length > 0) {
       throw new Error(

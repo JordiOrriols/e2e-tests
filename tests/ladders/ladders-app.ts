@@ -38,13 +38,23 @@ export const TEST_DATA_NAME = /^(E2E|Probe|ZZ)/;
 export async function hideConcurrentTestData(page: Page): Promise<void> {
   await page.getByTestId("member-list").evaluate((list, source) => {
     const name = new RegExp(source);
-    const hide = (element: Element | null, label: string | null | undefined) => {
+    const hide = (
+      element: Element | null,
+      label: string | null | undefined,
+    ) => {
       if (element && name.test(label?.trim() ?? "")) element.remove();
     };
-    list.querySelectorAll("section[aria-label]").forEach((team) => hide(team, team.getAttribute("aria-label")));
-    list.querySelectorAll('[data-testid^="member-card-"]').forEach((member) =>
-      hide(member, member.querySelector('[data-testid="member-name"]')?.textContent)
-    );
+    list
+      .querySelectorAll("section[aria-label]")
+      .forEach((team) => hide(team, team.getAttribute("aria-label")));
+    list
+      .querySelectorAll('[data-testid^="member-card-"]')
+      .forEach((member) =>
+        hide(
+          member,
+          member.querySelector('[data-testid="member-name"]')?.textContent,
+        ),
+      );
   }, TEST_DATA_NAME.source);
 }
 
@@ -63,9 +73,12 @@ export function ladderPath(path: string): string {
  */
 export async function waitForData(page: Page): Promise<void> {
   await expect(page.locator("#root > *").first()).toBeAttached();
-  await expect(page.getByRole("status", { name: "Loading..." })).toHaveCount(0, {
-    timeout: DATA_TIMEOUT,
-  });
+  await expect(page.getByRole("status", { name: "Loading..." })).toHaveCount(
+    0,
+    {
+      timeout: DATA_TIMEOUT,
+    },
+  );
 }
 
 export class LaddersApp {
@@ -449,28 +462,40 @@ export class LaddersApp {
     );
   }
 
-  /* Team sharing */
+  /* Workspaces and sharing, through the shared WorkspaceBar in the tab bar */
+
+  get workspaceSwitcher(): Locator {
+    return this.page.getByTestId("workspace-switcher");
+  }
+
+  async selectWorkspace(name: string): Promise<void> {
+    await this.workspaceSwitcher.click();
+    await this.page.getByRole("menuitemradio", { name, exact: true }).click();
+    await expect(this.workspaceSwitcher).toHaveAttribute("title", name);
+    await waitForData(this.page);
+  }
 
   get shareDialog(): Locator {
-    return this.page.getByTestId("share-team-dialog");
+    return this.page.getByTestId("share-workspace-dialog");
   }
 
   get shareError(): Locator {
     return this.page.getByTestId("share-error");
   }
 
-  async openShareDialog(teamName: string): Promise<void> {
-    await this.page.getByTestId("tab-team").click();
-    await this.teamSectionByName(teamName)
-      .getByTestId("team-share-open")
-      .click();
+  async openShareDialog(workspaceName: string): Promise<void> {
+    await this.selectWorkspace(workspaceName);
+    await this.page.getByTestId("workspace-share").click();
     await expect(this.shareDialog).toBeVisible();
   }
 
   async share(email: string, access: "viewer" | "editor"): Promise<void> {
     await this.page.getByTestId("share-email-input").fill(email);
+    await expect(this.page.getByTestId("share-app-select")).toHaveValue(
+      "ladders",
+    );
     await this.page.getByTestId("share-access-select").selectOption(access);
-    await this.page.getByTestId("share-team-submit").click();
+    await this.page.getByTestId("share-submit").click();
   }
 
   shareRow(email: string): Locator {
@@ -485,13 +510,16 @@ export class LaddersApp {
     return row;
   }
 
+  /** The row's Ladders access select. */
+  shareAccess(email: string): Locator {
+    return this.shareRow(email).getByTestId("share-row-ladders");
+  }
+
   async changeShareAccess(
     email: string,
     access: "viewer" | "editor",
   ): Promise<void> {
-    await this.shareRow(email)
-      .getByTestId("share-row-access")
-      .selectOption(access);
+    await this.shareAccess(email).selectOption(access);
   }
 
   async removeShare(email: string): Promise<void> {
@@ -543,7 +571,9 @@ export async function captureNextAlert(
   await action();
   const modal = page.getByTestId("alert-modal");
   await expect(modal).toBeVisible();
-  const message = await modal.locator('[data-slot="alert-dialog-description"]').innerText();
+  const message = await modal
+    .locator('[data-slot="alert-dialog-description"]')
+    .innerText();
   await page.getByTestId("alert-modal-close").click();
   await expect(modal).toBeHidden();
   return message;
