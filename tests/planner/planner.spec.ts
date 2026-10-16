@@ -31,7 +31,7 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     await page.getByLabel("Workspace name").fill(workspaceName);
     await page.getByRole("button", { name: "Create workspace", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Feature estimation" })).toBeVisible();
-    const workspaces = await api<{ id: string }[]>(owner, `workspaces?name=eq.${encodeURIComponent(workspaceName)}&select=id`);
+    const workspaces = await api<{ id: string }[]>(owner, `workspaces?name=eq.${encodeURIComponent(workspaceName)}&created_for_team=is.false&select=id`);
     workspaceId = workspaces?.[0]?.id;
     if (!workspaceId) throw new Error("Test workspace was not persisted");
     await page.getByRole("link", { name: "Team configuration", exact: true }).click();
@@ -172,7 +172,7 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     expect(runtimeErrors).toEqual([]);
   } finally {
     if (!workspaceId) {
-      const rows = await api<{ id: string }[]>(owner, `workspaces?name=eq.${encodeURIComponent(workspaceName)}&select=id`);
+      const rows = await api<{ id: string }[]>(owner, `workspaces?name=eq.${encodeURIComponent(workspaceName)}&created_for_team=is.false&select=id`);
       workspaceId = rows?.[0]?.id;
     }
     if (workspaceId) await api(owner, `workspaces?id=eq.${workspaceId}`, { method: "DELETE" });

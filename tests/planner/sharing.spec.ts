@@ -63,7 +63,7 @@ test.describe("Planner workspace sharing", () => {
     await expect(viewer.getByRole("button", { name: "Calibrate velocity", exact: true })).toHaveCount(0);
 
     await permission.selectOption("editor");
-    await expect.poll(async () => (await api<{ access_level: string }[]>(owner, "rpc/planner_list_workspace_shares", {
+    await expect.poll(async () => (await api<{ access_level: string }[]>(owner, "rpc/list_workspace_shares", {
       method: "POST", body: JSON.stringify({ workspace: workspace.id }),
     }))?.map(share => share.access_level)).toEqual(["editor"]);
     await viewer.getByRole("link", { name: "Estimation", exact: true }).click();
@@ -84,7 +84,7 @@ test.describe("Planner workspace sharing", () => {
 
   test("the workspace menu creates a workspace and switches to it", async ({ browser }) => {
     const name = `Created ${randomUUID().slice(0, 8)}`;
-    cleanup.push(() => api(owner, `workspaces?name=eq.${encodeURIComponent(name)}`, { method: "DELETE" }));
+    cleanup.push(() => api(owner, `workspaces?name=eq.${encodeURIComponent(name)}&created_for_team=is.false`, { method: "DELETE" }));
     const { page, context } = await authenticatedPage(browser, owner);
     contexts.push(context);
     await waitForWorkspace(page);
