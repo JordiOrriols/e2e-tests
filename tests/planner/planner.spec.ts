@@ -70,8 +70,45 @@ async function removeRoster(account: Account, team: string) {
   await api(account, `teams?id=eq.${team}`, { method: "DELETE" });
 }
 
+async function selectWorkspace(page: Page, name: string) {
+  await page.getByRole("button", { name: "Workspace", exact: true }).click();
+  await page.getByRole("menuitemradio", { name, exact: true }).click();
+  await expect(page.getByRole("button", { name: "Workspace", exact: true })).toHaveAttribute("title", name);
+}
+async function setPlanStart(page: Page, date: string) {
+  const input = page.getByLabel("Plan starts", { exact: true }).and(page.locator("input"));
+  if (!(await input.isVisible())) await page.getByRole("button", { name: "Edit plan start", exact: true }).click();
+  await input.fill(date);
+  // The editor closes once the plan start is saved; until then the schedule is read-only.
+  await expect(input).toBeHidden();
+}
+/** The vacation calendar opens on the current month; page to the month of `date`. */
+async function showMonth(page: Page, date: string) {
+  const target = new Date(`${date}T00:00:00`);
+  const now = new Date();
+  const offset = (target.getFullYear() - now.getFullYear()) * 12 + target.getMonth() - now.getMonth();
+  const button = page.getByRole("button", { name: offset > 0 ? "Next month" : "Previous month", exact: true });
+  for (let step = 0; step < Math.abs(offset); step++) await button.click();
+}
+function calendarDay(page: Page, date: string) {
+  return page.getByRole("button", { name: new RegExp(`^${date}( |$)`) });
+}
+async function setAvailability(page: Page, from: string, to: string, action: "Vacations" | "Working Day") {
+  await showMonth(page, from);
+  await calendarDay(page, from).click();
+  if (to !== from) await calendarDay(page, to).click();
+  await page.getByRole("button", { name: action, exact: true }).click();
+}
+function vacationBadge(page: Page, date: string, member: string) {
+  return calendarDay(page, date).getByLabel(`${member}: vacation`, { exact: true });
+}
+async function roadmapRowAction(page: Page, feature: string, action: string) {
+  await page.getByLabel(`Schedule row: ${feature}`, { exact: true }).click({ button: "right", position: { x: 40, y: 12 } });
+  await page.getByRole("menuitem", { name: action, exact: true }).click();
+}
+
 test("estimates, priority scheduling, linked Ladders teams and token vacations persist through Supabase", async ({ browser }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const owner = await signIn();
   const collaborator = await signIn(true);
   const { page, context } = await authenticatedPage(browser, owner);
@@ -86,15 +123,18 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
   let workspaceId: string | undefined;
   let secondContext: BrowserContext | undefined;
   try {
-    await expect(page.getByRole("heading", { name: /Microproject estimation|Your planning workspace/ })).toBeVisible();
-    if (await page.getByRole("button", { name: "New workspace" }).isVisible()) await page.getByRole("button", { name: "New workspace" }).click();
+    await expect(page.getByRole("heading", { name: /Feature estimation|Your planning workspace/ })).toBeVisible();
+    if (await page.getByRole("button", { name: "Workspace", exact: true }).isVisible()) {
+      await page.getByRole("button", { name: "Workspace", exact: true }).click();
+      await page.getByRole("menuitem", { name: "New workspace" }).click();
+    }
     await page.getByLabel("Workspace name").fill(workspaceName);
     await page.getByRole("button", { name: "Create workspace", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Microproject estimation" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Feature estimation" })).toBeVisible();
     const workspaces = await api<{ id: string }[]>(owner, `planner_workspaces?name=eq.${encodeURIComponent(workspaceName)}&select=id`);
     workspaceId = workspaces?.[0]?.id;
     if (!workspaceId) throw new Error("Test workspace was not persisted");
-    await page.getByRole("link", { name: "Vacations", exact: true }).click();
+    await page.getByRole("link", { name: "Team configuration", exact: true }).click();
     await page.getByRole("checkbox", { name: workspaceName, exact: true }).check();
     await page.getByRole("button", { name: "Save linked teams" }).click();
     await expect(page.getByLabel("Planning role for Owner")).toHaveValue("backend");
@@ -108,22 +148,22 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
       }),
     })).rejects.toThrow(/planner_projects_whole_estimates/);
 
-    await expect(page.getByTestId("header-title")).toHaveText("Cadence");
+    await expect(page.getByTestId("header-title")).toHaveText("Planner");
     await expect(page.getByTestId("header-title")).toHaveCSS("font-size", "18px");
     await expect(page.getByTestId("header-subtitle")).toHaveCSS("font-size", "12px");
     await expect(page.getByTestId("header-content").locator("svg")).toHaveCSS("width", "20px");
     await page.getByRole("button", { name: "Language", exact: true }).click();
     await page.getByRole("menuitemradio", { name: "Español" }).click();
-    await expect(page.getByRole("link", { name: "Plan del backlog" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Hoja de ruta" })).toBeVisible();
     await expect(page.getByTestId("sign-out-button")).toHaveAccessibleName("Cerrar sesión");
-    for (const [language, backlog, signOut] of [
-      ["Français", "Plan du backlog", "Se déconnecter"],
-      ["Deutsch", "Backlog-Plan", "Abmelden"],
-      ["Italiano", "Piano backlog", "Esci"],
+    for (const [language, roadmap, signOut] of [
+      ["Français", "Feuille de route", "Se déconnecter"],
+      ["Deutsch", "Roadmap", "Abmelden"],
+      ["Italiano", "Roadmap", "Esci"],
     ]) {
       await page.getByTestId("language-selector").click();
       await page.getByRole("menuitemradio", { name: language }).click();
-      await expect(page.getByRole("link", { name: backlog })).toBeVisible();
+      await expect(page.getByRole("link", { name: roadmap })).toBeVisible();
       await expect(page.getByTestId("sign-out-button")).toHaveAccessibleName(signOut);
     }
     await page.getByTestId("language-selector").click();
@@ -138,7 +178,7 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     expect(tabs!.y).toBeGreaterThanOrEqual(brand!.y + brand!.height);
     expect(await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
     await page.setViewportSize({ width: 1280, height: 900 });
-    await page.getByRole("button", { name: "New microproject" }).click();
+    await page.getByRole("button", { name: "New feature" }).click();
     await page.getByLabel("Name", { exact: true }).fill("Checkout");
     for (const role of ["Backend", "Frontend", "Design", "QA"]) {
       for (const field of ["people", "weeks"]) {
@@ -151,39 +191,37 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     }
     await page.getByLabel("Backend people").fill("1");
     await page.getByLabel("Backend weeks").fill("1");
-    await page.getByRole("button", { name: "Create microproject" }).click();
+    await page.getByRole("button", { name: "Create feature" }).click();
     await expect(page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Backlog Plan", exact: true }).click();
-    await page.getByRole("button", { name: "Add projects", exact: true }).first().click();
-    await page.getByRole("dialog").getByRole("button", { name: "Add to backlog: Checkout", exact: true }).click();
-    await expect(page.getByRole("dialog")).toContainText("All estimates are already in the backlog.");
+    await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+    await page.getByRole("button", { name: "Add feature", exact: true }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: "Add feature to roadmap: Checkout", exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText("All features are already on the roadmap.");
     await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
-    await page.getByRole("button", { name: "Remove from backlog: Checkout", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "No projects in the backlog" })).toBeVisible();
-    await page.getByRole("button", { name: "Add projects", exact: true }).first().click();
-    await page.getByRole("dialog").getByRole("button", { name: "Add to backlog: Checkout", exact: true }).click();
-    await expect(page.getByRole("dialog")).toContainText("All estimates are already in the backlog.");
+    await roadmapRowAction(page, "Checkout", "Remove from roadmap");
+    await expect(page.getByRole("heading", { name: "No features on the roadmap" })).toBeVisible();
+    await page.getByRole("button", { name: "Add feature", exact: true }).first().click();
+    await page.getByRole("dialog").getByRole("button", { name: "Add feature to roadmap: Checkout", exact: true }).click();
+    await expect(page.getByRole("dialog")).toContainText("All features are already on the roadmap.");
     await page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
     await page.reload();
-    await page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId);
+    await selectWorkspace(page, workspaceName);
     await expect.poll(async () => ({
       errors: runtimeErrors,
-      selectedProjectVisible: await page.getByRole("button", { name: "Remove from backlog: Checkout", exact: true }).isVisible(),
-    })).toEqual({ errors: [], selectedProjectVisible: true });
-    await page.getByLabel("Plan starts").fill("2026-10-05");
-    await expect(page.getByLabel("Project schedule")).toContainText("Oct 9, 2026");
+      selectedFeatureVisible: await page.getByLabel("Schedule row: Checkout", { exact: true }).isVisible(),
+    })).toEqual({ errors: [], selectedFeatureVisible: true });
+    await setPlanStart(page, "2026-10-05");
+    await expect(page.getByLabel("Checkout: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
 
     await page.getByRole("link", { name: "Vacations", exact: true }).click();
     await page.getByLabel("Member", { exact: true }).selectOption(roster.ownerMember.id);
-    await page.getByLabel("From", { exact: true }).fill("2026-10-05");
-    await page.getByLabel("To", { exact: true }).fill("2026-10-06");
-    await page.getByRole("button", { name: "Save availability" }).click();
-    await expect(page.getByText("2026-10-05: Not working", { exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Backlog Plan" }).click();
-    await page.getByLabel("Plan starts").fill("2026-10-05");
-    await expect(page.getByLabel("Project schedule")).toContainText("Oct 14, 2026");
+    await setAvailability(page, "2026-10-05", "2026-10-06", "Vacations");
+    await expect(vacationBadge(page, "2026-10-05", "Owner")).toBeVisible();
+    await expect(vacationBadge(page, "2026-10-06", "Owner")).toBeVisible();
+    await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+    // Oct 12 is a Barcelona holiday, so five working days after the leave end on Oct 14.
+    await expect(page.getByLabel("Checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
 
-    await page.getByRole("link", { name: "Vacations", exact: true }).click();
     await api(owner, "rpc/share_team_by_email", {
       method: "POST",
       body: JSON.stringify({ p_team_id: roster.team.id, p_email: collaborator.user.email, p_access: "viewer" }),
@@ -191,11 +229,14 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
 
     const second = await authenticatedPage(browser, collaborator);
     secondContext = second.context;
-    await second.page.getByLabel("Workspace", { exact: true }).selectOption(workspaceId);
+    await selectWorkspace(second.page, workspaceName);
     await expect(second.page.getByRole("heading", { name: "Checkout", exact: true })).toBeVisible();
-    await expect(second.page.getByRole("button", { name: "New microproject" })).toHaveCount(0);
+    await expect(second.page.getByRole("button", { name: "New feature" })).toHaveCount(0);
     await second.page.getByRole("link", { name: "Vacations", exact: true }).click();
-    await expect(second.page.getByRole("button", { name: "Save availability" })).toBeDisabled();
+    await showMonth(second.page, "2026-10-05");
+    await expect(calendarDay(second.page, "2026-10-08")).toBeDisabled();
+    await expect(second.page.getByRole("button", { name: "Vacations", exact: true })).toBeDisabled();
+    await second.page.getByRole("link", { name: "Team configuration", exact: true }).click();
     await expect(second.page.getByLabel("Planning role for Owner")).toBeDisabled();
     await expect(second.page.getByRole("button", { name: /Copy vacation link/ })).toHaveCount(0);
     await expect(api(collaborator, "rpc/planner_set_team_availability", {
@@ -208,14 +249,14 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
       await vacationPage.goto(`http://127.0.0.1:5176/#/vacations/${roster.ownerMember.vacation_token}`);
       await expect(vacationPage.getByRole("heading", { name: "Owner", exact: true })).toBeVisible();
       await expect(vacationPage.getByLabel("Workspace", { exact: true })).toHaveCount(0);
-      await vacationPage.getByLabel("From", { exact: true }).fill("2026-10-07");
-      await vacationPage.getByLabel("To", { exact: true }).fill("2026-10-07");
-      await vacationPage.getByRole("button", { name: "Save availability" }).click();
-      await expect(vacationPage.getByText("2026-10-07: Not working", { exact: true })).toBeVisible();
+      await setAvailability(vacationPage, "2026-10-07", "2026-10-07", "Vacations");
+      await expect(vacationBadge(vacationPage, "2026-10-07", "Owner")).toBeVisible();
       await vacationPage.reload();
-      await expect(vacationPage.getByText("2026-10-07: Not working", { exact: true })).toBeVisible();
-      await vacationPage.getByRole("button", { name: "Restore calendar default for 2026-10-07", exact: true }).click();
-      await expect(vacationPage.getByText("2026-10-07: Not working", { exact: true })).toHaveCount(0);
+      await showMonth(vacationPage, "2026-10-07");
+      await expect(vacationBadge(vacationPage, "2026-10-07", "Owner")).toBeVisible();
+      await setAvailability(vacationPage, "2026-10-07", "2026-10-07", "Working Day");
+      await expect(vacationBadge(vacationPage, "2026-10-07", "Owner")).toHaveCount(0);
+      await expect(vacationBadge(vacationPage, "2026-10-05", "Owner")).toBeVisible();
       await vacationPage.goto(`http://127.0.0.1:5176/#/vacations/${roster.ownerMember.self_token}`);
       await expect(vacationPage.getByRole("alert")).toContainText("Invalid vacation link");
     } finally { await anonymous.close(); }
@@ -224,10 +265,10 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     await page.getByRole("button", { name: "Edit Checkout" }).click();
     await page.getByLabel("Backend weeks").fill("2");
     await page.getByRole("button", { name: "Save changes" }).click();
-    await expect(page.locator("article")).toContainText("1×2w");
+    await expect(page.getByRole("article", { name: "Checkout" })).toContainText(/Duration\s*2\s*weeks/i);
     await page.getByRole("button", { name: "Delete Checkout" }).click();
     await page.getByRole("alertdialog").getByRole("button", { name: "Delete", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "No microprojects yet" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "No features yet" })).toBeVisible();
     expect(runtimeErrors).toEqual([]);
   } finally {
     if (!workspaceId) {
@@ -241,12 +282,13 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
   }
 });
 
-test("backlog priorities can be reordered and different roles run in parallel", async ({ browser }) => {
+test("roadmap priorities can be reordered and different roles run in parallel", async ({ browser }) => {
   const owner = await signIn();
   const roster = await createRoster(owner, `Planner order team ${randomUUID().slice(0, 8)}`);
+  const workspaceName = `Planner order ${randomUUID().slice(0, 8)}`;
   const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
     method: "POST",
-    body: JSON.stringify({ workspace_name: `Planner order ${randomUUID().slice(0, 8)}` }),
+    body: JSON.stringify({ workspace_name: workspaceName }),
   });
   if (!workspace) throw new Error("Workspace creation did not return a row");
   let context: BrowserContext | undefined;
@@ -268,24 +310,25 @@ test("backlog priorities can be reordered and different roles run in parallel", 
     const opened = await authenticatedPage(browser, owner);
     context = opened.context;
     const page = opened.page;
-    await expect(page.getByLabel("Workspace", { exact: true })).toBeVisible();
-    await page.getByLabel("Workspace", { exact: true }).selectOption(workspace.id);
-    await page.getByRole("link", { name: "Backlog Plan", exact: true }).click();
-    await page.getByLabel("Plan starts").fill("2026-10-05");
+    await selectWorkspace(page, workspaceName);
+    await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+    await setPlanStart(page, "2026-10-05");
     await expect(page.getByLabel("First: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Parallel frontend: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "Move Second up", exact: true }).click();
+    const reorderSecond = page.getByRole("button", { name: "Reorder Second", exact: true });
+    await expect(reorderSecond).toBeEnabled();
+    await reorderSecond.press("ArrowUp");
     await expect(page.getByLabel("Second: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
     await expect(page.getByLabel("First: Oct 13, 2026 to Oct 19, 2026", { exact: true })).toBeVisible();
     await page.reload();
-    await page.getByLabel("Workspace", { exact: true }).selectOption(workspace.id);
-    await page.getByLabel("Plan starts").fill("2026-10-05");
+    await selectWorkspace(page, workspaceName);
+    // Both the priority order and the plan start are saved on the workspace.
     await expect(page.getByLabel("Second: Oct 5, 2026 to Oct 9, 2026", { exact: true })).toBeVisible();
-    await page.getByRole("link", { name: "Vacations", exact: true }).click();
+    await page.getByRole("link", { name: "Team configuration", exact: true }).click();
     await page.getByLabel("Planning role for Owner", { exact: true }).selectOption("design");
     await expect(page.getByLabel("Planning role for Owner", { exact: true })).toHaveValue("design");
-    await page.getByRole("link", { name: "Backlog Plan", exact: true }).click();
-    await expect(page.getByLabel("Project schedule")).toContainText("No Backend capacity");
+    await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+    await expect(page.getByLabel("Feature schedule")).toContainText("No Backend capacity");
   } finally {
     await api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" });
     await removeRoster(owner, roster.team.id);
@@ -350,8 +393,8 @@ test("Ladders shares a personal vacation link and its leave updates two multi-te
     const opened = await authenticatedPage(browser, owner);
     context = opened.context;
     const page = opened.page;
-    await page.getByLabel("Workspace", { exact: true }).selectOption(workspaces[0]!);
-    await page.getByRole("link", { name: "Vacations", exact: true }).click();
+    await selectWorkspace(page, `First plan ${suffix}`);
+    await page.getByRole("link", { name: "Team configuration", exact: true }).click();
     await page.getByRole("checkbox", { name: `Shared roster ${suffix}`, exact: true }).check();
     await page.getByRole("checkbox", { name: `Design roster ${suffix}`, exact: true }).check();
     await page.getByRole("button", { name: "Save linked teams", exact: true }).click();
@@ -388,16 +431,14 @@ test("Ladders shares a personal vacation link and its leave updates two multi-te
     const vacationPage = await anonymous.newPage();
     await vacationPage.goto(vacationURL);
     await expect(vacationPage.getByRole("heading", { name: "Owner", exact: true })).toBeVisible();
-    await vacationPage.getByLabel("From", { exact: true }).fill("2026-10-05");
-    await vacationPage.getByLabel("To", { exact: true }).fill("2026-10-06");
-    await vacationPage.getByRole("button", { name: "Save availability" }).click();
-    await expect(vacationPage.getByText("2026-10-05: Not working", { exact: true })).toBeVisible();
+    await setAvailability(vacationPage, "2026-10-05", "2026-10-06", "Vacations");
+    await expect(vacationBadge(vacationPage, "2026-10-05", "Owner")).toBeVisible();
     expect(await vacationPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
     await page.reload();
-    for (const workspace of workspaces) {
-      await page.getByLabel("Workspace", { exact: true }).selectOption(workspace);
-      await page.getByRole("link", { name: "Backlog Plan", exact: true }).click();
-      await page.getByLabel("Plan starts").fill("2026-10-05");
+    for (const name of ["First plan", "Second plan"]) {
+      await selectWorkspace(page, `${name} ${suffix}`);
+      await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+      await setPlanStart(page, "2026-10-05");
       await expect(page.getByLabel("Shared checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
     }
     const availability = await api<{ member_id: string; date: string }[]>(owner, `planner_team_availability?member_id=eq.${roster.ownerMember.id}&select=member_id,date`);
