@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { existsSync, readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { randomUUID } from "node:crypto";
@@ -48,15 +48,18 @@ test("switching to Catalan translates every Planner page and persists after a re
   const teamName = `Idioma ${randomUUID().slice(0, 8)}`;
   // Member names stay out of the English strings so they are not mistaken for UI text.
   const workspace = await createWorkspace(owner);
-  await createRoster(owner, teamName, [
-    { name: "Núria", planning_role: "backend" }, { name: "Jordi", planning_role: "frontend" },
-  ], workspace.id);
-  await addFeatures(owner, workspace.id, [
-    { name: "Pagament", backend_devs: 2, backend_weeks: 2, frontend_devs: 1, frontend_weeks: 2, priority: 0, in_backlog: true },
-    { name: "Cercador", design_devs: 1, design_weeks: 1, qa_devs: 1, qa_weeks: 1, in_backlog: false },
-  ]);
-  const { page, context } = await authenticatedPage(browser, owner);
+  let context: BrowserContext | undefined;
   try {
+    await createRoster(owner, teamName, [
+      { name: "Núria", planning_role: "backend" }, { name: "Jordi", planning_role: "frontend" },
+    ], workspace.id);
+    await addFeatures(owner, workspace.id, [
+      { name: "Pagament", backend_devs: 2, backend_weeks: 2, frontend_devs: 1, frontend_weeks: 2, priority: 0, in_backlog: true },
+      { name: "Cercador", design_devs: 1, design_weeks: 1, qa_devs: 1, qa_weeks: 1, in_backlog: false },
+    ]);
+    const opened = await authenticatedPage(browser, owner);
+    context = opened.context;
+    const page = opened.page;
     await selectWorkspace(page, workspace.name);
     await page.getByTestId("language-selector").click();
     await page.getByTestId("language-button-ca").click();
@@ -93,7 +96,7 @@ test("switching to Catalan translates every Planner page and persists after a re
     await expect(page.getByRole("dialog").or(page.getByRole("alertdialog"))).toBeVisible();
     expect(await untranslated(page, english), "English text in the feature editor").toEqual([]);
   } finally {
-    await context.close();
+    await context?.close();
     await removeWorkspace(owner, workspace.id);
   }
 });
