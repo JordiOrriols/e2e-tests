@@ -112,15 +112,15 @@ test.describe("Planner roadmap", () => {
     cleanup.push(() => removeRoster(owner, roster.team.id));
     const workspace = await seedRoadmap(owner, roster.team.id, []);
     cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
-    const projects = await api<{ id: string; name: string }[]>(owner, "planner_main_projects", {
+    const projects = await api<{ id: string; name: string }[]>(owner, "projects", {
       method: "POST", headers: { Prefer: "return=representation" },
       body: JSON.stringify(["Payments", "Search"].map(name => ({ workspace_id: workspace.id, name }))),
     });
     const projectId = (name: string) => projects!.find(project => project.name === name)!.id;
     await addFeatures(owner, workspace.id, [
-      { name: "Checkout", backend_devs: 1, backend_weeks: 1, main_project_id: projectId("Payments") },
-      { name: "Refunds", backend_devs: 1, backend_weeks: 1, main_project_id: projectId("Payments") },
-      { name: "Indexing", backend_devs: 1, backend_weeks: 1, main_project_id: projectId("Search") },
+      { name: "Checkout", backend_devs: 1, backend_weeks: 1, project_id: projectId("Payments") },
+      { name: "Refunds", backend_devs: 1, backend_weeks: 1, project_id: projectId("Payments") },
+      { name: "Indexing", backend_devs: 1, backend_weeks: 1, project_id: projectId("Search") },
     ]);
     const opened = await authenticatedPage(browser, owner);
     context = opened.context;

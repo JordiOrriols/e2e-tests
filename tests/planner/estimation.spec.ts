@@ -21,15 +21,15 @@ test.describe("Planner feature estimation", () => {
     cleanup.push(() => removeRoster(owner, roster.team.id));
     workspace = await seedRoadmap(owner, roster.team.id, []);
     cleanup.push(() => api(owner, `planner_workspaces?id=eq.${workspace.id}`, { method: "DELETE" }));
-    const projects = await api<{ id: string; name: string }[]>(owner, "planner_main_projects", {
+    const projects = await api<{ id: string; name: string }[]>(owner, "projects", {
       method: "POST", headers: { Prefer: "return=representation" },
       body: JSON.stringify(["Payments", "Search"].map(name => ({ workspace_id: workspace.id, name }))),
     });
     const projectId = (name: string) => projects!.find(project => project.name === name)!.id;
     // Inserted out of priority order so the page has to sort the Roadmap group itself.
     await addFeatures(owner, workspace.id, [
-      { name: "Search filters", priority: 2, backend_devs: 1, backend_weeks: 2, main_project_id: projectId("Search") },
-      { name: "Checkout", priority: 1, backend_devs: 2, backend_weeks: 2, frontend_devs: 1, frontend_weeks: 3, qa_devs: 1, qa_weeks: 1, main_project_id: projectId("Payments") },
+      { name: "Search filters", priority: 2, backend_devs: 1, backend_weeks: 2, project_id: projectId("Search") },
+      { name: "Checkout", priority: 1, backend_devs: 2, backend_weeks: 2, frontend_devs: 1, frontend_weeks: 3, qa_devs: 1, qa_weeks: 1, project_id: projectId("Payments") },
       { name: "Dark mode", in_backlog: false, frontend_devs: 1, frontend_weeks: 1 },
     ]);
     ({ context, page } = await authenticatedPage(browser, owner));

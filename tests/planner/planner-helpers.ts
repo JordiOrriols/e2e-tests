@@ -123,7 +123,7 @@ export async function roadmapRowAction(page: Page, feature: string, action: stri
 
 export type Feature = { name: string } & Partial<Record<
   "backend_devs" | "backend_weeks" | "frontend_devs" | "frontend_weeks" | "design_devs" | "design_weeks" | "qa_devs" | "qa_weeks"
-  | "priority" | "main_project_id", number | string>> & { in_backlog?: boolean };
+  | "priority" | "project_id", number | string>> & { in_backlog?: boolean };
 
 const ROLE_FIELDS = ["backend", "frontend", "design", "qa"].flatMap(role => [`${role}_devs`, `${role}_weeks`]);
 
@@ -140,11 +140,11 @@ export async function seedRoadmap(owner: Account, teamId: string, features: Feat
   return { id: workspace.id, name: workspaceName };
 }
 export async function addFeatures(owner: Account, workspaceId: string, features: Feature[]) {
-  await api(owner, "planner_projects", {
+  await api(owner, "features", {
     method: "POST",
     body: JSON.stringify(features.map((feature, index) => ({
       // A bulk insert needs every row to carry the same columns.
-      workspace_id: workspaceId, in_backlog: true, priority: index + 1, main_project_id: null,
+      workspace_id: workspaceId, in_backlog: true, priority: index + 1, project_id: null,
       ...Object.fromEntries(ROLE_FIELDS.map(field => [field, 0])), ...feature,
     }))),
   });

@@ -7,7 +7,7 @@ import {
 
 type Row = { date: string; is_working: boolean };
 const octoberRows = (owner: Account, member: string) => api<Row[]>(owner,
-  `planner_team_availability?member_id=eq.${member}&date=gte.2026-10-01&date=lte.2026-10-31&select=date,is_working&order=date`);
+  `vacations?member_id=eq.${member}&date=gte.2026-10-01&date=lte.2026-10-31&select=date,is_working&order=date`);
 const pressedDays = (page: Page) => page.locator('button[aria-pressed="true"]').evaluateAll(days =>
   days.map(day => day.getAttribute("aria-label")!.slice(0, 10)));
 const days = (from: number, to: number) =>
@@ -39,7 +39,7 @@ test.describe("Planner vacation calendar", () => {
       method: "POST", body: JSON.stringify({ workspace: workspace!.id, team_ids: [roster.team.id] }),
     });
     // A day explicitly marked as worked (a working Saturday) must survive clearing the vacations around it.
-    await api(owner, "planner_team_availability", {
+    await api(owner, "vacations", {
       method: "POST", body: JSON.stringify({ member_id: roster.ownerMember.id, date: "2026-10-10", is_working: true }),
     });
     const opened = await authenticatedPage(browser, owner);
@@ -93,7 +93,7 @@ test.describe("Planner vacation calendar", () => {
 
   test("a personal vacation link shows the teammates' vacations with a legend and initials", async ({ browser }) => {
     const teammate = roster.members[1]!;
-    await api(owner, "rpc/planner_set_team_availability", {
+    await api(owner, "rpc/planner_set_vacations", {
       method: "POST",
       body: JSON.stringify({ member: teammate.id, start_date: "2026-10-07", end_date: "2026-10-07", working: false }),
     });

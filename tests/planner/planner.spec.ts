@@ -40,13 +40,13 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     await expect(page.getByLabel("Planning role for Owner")).toHaveValue("backend");
     await page.getByRole("link", { name: "Estimation", exact: true }).click();
 
-    await expect(api(owner, "planner_projects", {
+    await expect(api(owner, "features", {
       method: "POST",
       body: JSON.stringify({
         workspace_id: workspaceId, name: "Rejected fractional estimate",
         backend_devs: 1, backend_weeks: 1.5,
       }),
-    })).rejects.toThrow(/planner_projects_whole_estimates/);
+    })).rejects.toThrow(/features_whole_estimates/);
 
     await expect(page.getByTestId("header-title")).toHaveText("Planner");
     await expect(page.getByTestId("header-title")).toHaveCSS("font-size", "18px");
@@ -139,7 +139,7 @@ test("estimates, priority scheduling, linked Ladders teams and token vacations p
     await second.page.getByRole("link", { name: "Team configuration", exact: true }).click();
     await expect(second.page.getByLabel("Planning role for Owner")).toBeDisabled();
     await expect(second.page.getByRole("button", { name: /Copy vacation link/ })).toHaveCount(0);
-    await expect(api(collaborator, "rpc/planner_set_team_availability", {
+    await expect(api(collaborator, "rpc/planner_set_vacations", {
       method: "POST", body: JSON.stringify({ member: roster.ownerMember.id, start_date: "2026-10-08", end_date: "2026-10-08", working: false }),
     })).rejects.toThrow(/Team edit access/);
 
@@ -197,13 +197,13 @@ test("roadmap priorities can be reordered and different roles run in parallel", 
       method: "POST",
       body: JSON.stringify({ workspace: workspace.id, team_ids: [roster.team.id] }),
     });
-    await api(owner, "planner_projects", {
+    await api(owner, "features", {
       method: "POST",
       body: JSON.stringify(["First", "Second"].map((name, index) => ({
         workspace_id: workspace.id, name, in_backlog: true, priority: index + 1, backend_devs: 1, backend_weeks: 1,
       }))),
     });
-    await api(owner, "planner_projects", {
+    await api(owner, "features", {
       method: "POST",
       body: JSON.stringify({ workspace_id: workspace.id, name: "Parallel frontend", in_backlog: true, priority: 3, frontend_devs: 1, frontend_weeks: 1 }),
     });
@@ -283,7 +283,7 @@ test("Ladders shares a personal vacation link and its leave updates two multi-te
       });
       if (!workspace) throw new Error("Shared plan creation returned no row");
       workspaces.push(workspace.id);
-      await api(owner, "planner_projects", {
+      await api(owner, "features", {
         method: "POST", body: JSON.stringify({
           workspace_id: workspace.id, name: "Shared checkout", in_backlog: true,
           backend_devs: 1, backend_weeks: 1,
@@ -341,7 +341,7 @@ test("Ladders shares a personal vacation link and its leave updates two multi-te
       await setPlanStart(page, "2026-10-05");
       await expect(page.getByLabel("Shared checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
     }
-    const availability = await api<{ member_id: string; date: string }[]>(owner, `planner_team_availability?member_id=eq.${roster.ownerMember.id}&select=member_id,date`);
+    const availability = await api<{ member_id: string; date: string }[]>(owner, `vacations?member_id=eq.${roster.ownerMember.id}&select=member_id,date`);
     expect(availability).toHaveLength(2);
   } finally {
     for (const workspace of workspaces) await api(owner, `planner_workspaces?id=eq.${workspace}`, { method: "DELETE" });
