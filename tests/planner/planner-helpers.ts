@@ -1,4 +1,5 @@
 import { expect, type Browser, type Page, type BrowserContext } from "@playwright/test";
+import { randomUUID } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 
@@ -74,9 +75,17 @@ export async function removeRoster(account: Account, team: string) {
   await api(account, `teams?id=eq.${team}`, { method: "DELETE" });
 }
 
+/** First loads hit the remote Supabase and can outlast the default expect timeout under load. */
+export const DATA_TIMEOUT = 15_000;
+export async function waitForWorkspace(page: Page) {
+  await expect(page.getByRole("button", { name: "Workspace", exact: true })).toBeVisible({ timeout: DATA_TIMEOUT });
+  await expect(page.getByRole("status").filter({ hasText: /^Loading/ })).toHaveCount(0, { timeout: DATA_TIMEOUT });
+}
 export async function selectWorkspace(page: Page, name: string) {
+  await waitForWorkspace(page);
   await page.getByRole("button", { name: "Workspace", exact: true }).click();
   await page.getByRole("menuitemradio", { name, exact: true }).click();
+  await waitForWorkspace(page);
   await expect(page.getByRole("button", { name: "Workspace", exact: true })).toHaveAttribute("title", name);
 }
 export async function setPlanStart(page: Page, date: string) {
@@ -109,4 +118,33 @@ export function vacationBadge(page: Page, date: string, member: string) {
 export async function roadmapRowAction(page: Page, feature: string, action: string) {
   await page.getByLabel(`Schedule row: ${feature}`, { exact: true }).click({ button: "right", position: { x: 40, y: 12 } });
   await page.getByRole("menuitem", { name: action, exact: true }).click();
+}
+
+export type Feature = { name: string } & Partial<Record<
+  "backend_devs" | "backend_weeks" | "frontend_devs" | "frontend_weeks" | "design_devs" | "design_weeks" | "qa_devs" | "qa_weeks"
+  | "priority" | "main_project_id", number | string>> & { in_backlog?: boolean };
+
+const ROLE_FIELDS = ["backend", "frontend", "design", "qa"].flatMap(role => [`${role}_devs`, `${role}_weeks`]);
+
+/** A linked workspace whose roadmap holds `features` in the given priority order. */
+export async function seedRoadmap(owner: Account, teamId: string, features: Feature[]) {
+  const workspaceName = `Roadmap ${randomUUID().slice(0, 8)}`;
+  const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
+    method: "POST", body: JSON.stringify({ workspace_name: workspaceName }),
+  });
+  if (!workspace) throw new Error("Workspace creation did not return a row");
+  await api(owner, "rpc/planner_set_workspace_teams", {
+    method: "POST", body: JSON.stringify({ workspace: workspace.id, team_ids: [teamId] }),
+  });
+  return { id: workspace.id, name: workspaceName };
+}
+export async function addFeatures(owner: Account, workspaceId: string, features: Feature[]) {
+  await api(owner, "planner_projects", {
+    method: "POST",
+    body: JSON.stringify(features.map((feature, index) => ({
+      // A bulk insert needs every row to carry the same columns.
+      workspace_id: workspaceId, in_backlog: true, priority: index + 1, main_project_id: null,
+      ...Object.fromEntries(ROLE_FIELDS.map(field => [field, 0])), ...feature,
+    }))),
+  });
 }

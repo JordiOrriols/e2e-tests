@@ -1,38 +1,10 @@
 import { test, expect, type BrowserContext, type Locator, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
 import {
-  api, authenticatedPage, createRoster, removeRoster, roadmapRowAction, selectWorkspace, setPlanStart, signIn,
-  type Account,
+  addFeatures, api, authenticatedPage, createRoster, removeRoster, roadmapRowAction, seedRoadmap, selectWorkspace,
+  setPlanStart, signIn, type Account,
 } from "./planner-helpers";
 
-type Feature = { name: string } & Partial<Record<
-  "backend_devs" | "backend_weeks" | "frontend_devs" | "frontend_weeks" | "design_devs" | "design_weeks" | "qa_devs" | "qa_weeks"
-  | "main_project_id", number | string>>;
-
-const ROLE_FIELDS = ["backend", "frontend", "design", "qa"].flatMap(role => [`${role}_devs`, `${role}_weeks`]);
-
-/** A linked workspace whose roadmap holds `features` in the given priority order. */
-async function seedRoadmap(owner: Account, teamId: string, features: Feature[]) {
-  const workspaceName = `Roadmap ${randomUUID().slice(0, 8)}`;
-  const workspace = await api<{ id: string }>(owner, "rpc/planner_create_linked_workspace", {
-    method: "POST", body: JSON.stringify({ workspace_name: workspaceName }),
-  });
-  if (!workspace) throw new Error("Workspace creation did not return a row");
-  await api(owner, "rpc/planner_set_workspace_teams", {
-    method: "POST", body: JSON.stringify({ workspace: workspace.id, team_ids: [teamId] }),
-  });
-  return { id: workspace.id, name: workspaceName };
-}
-async function addFeatures(owner: Account, workspaceId: string, features: Feature[]) {
-  await api(owner, "planner_projects", {
-    method: "POST",
-    body: JSON.stringify(features.map((feature, index) => ({
-      // A bulk insert needs every row to carry the same columns.
-      workspace_id: workspaceId, in_backlog: true, priority: index + 1, main_project_id: null,
-      ...Object.fromEntries(ROLE_FIELDS.map(field => [field, 0])), ...feature,
-    }))),
-  });
-}
 async function openRoadmap(page: Page, workspaceName: string, start: string) {
   await selectWorkspace(page, workspaceName);
   await page.getByRole("link", { name: "Roadmap", exact: true }).click();

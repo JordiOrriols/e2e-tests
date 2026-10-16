@@ -79,6 +79,11 @@ export default defineConfig({
     {
       name: "planner-localhost",
       testDir: "./tests/planner",
+      /*
+       * Unlike ladders, most planner assertions follow a save that refetches the
+       * workspace from the remote Supabase, which can take several seconds.
+       */
+      expect: { timeout: 10_000 },
       use: {
         ...devices["Desktop Chrome"],
         baseURL: "http://127.0.0.1:5176",
