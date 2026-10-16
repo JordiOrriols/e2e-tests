@@ -17,6 +17,10 @@ const projectConfigs = {
     localhost: process.env.LADDERS_LOCAL_URL ?? "http://localhost:5175",
     production: "https://ladders.jordiorriols.cat",
   },
+  pulse: {
+    localhost: "http://127.0.0.1:5177",
+    production: "https://pulse.jordiorriols.cat",
+  },
 } as const;
 
 export type ProjectName = keyof typeof projectConfigs;
@@ -91,6 +95,16 @@ export default defineConfig({
         baseURL: "http://127.0.0.1:5176",
       },
       metadata: { project: "planner", environment: "localhost" },
+    },
+    // Pulse
+    {
+      name: "pulse-localhost",
+      testDir: "./tests/pulse",
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: projectConfigs.pulse.localhost,
+      },
+      metadata: { project: "pulse", environment: "localhost" },
     },
     // Website
     {
