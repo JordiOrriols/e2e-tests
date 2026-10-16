@@ -94,6 +94,10 @@ test.describe("Pulse retrospectives", () => {
     await ownerPage.getByRole("button", { name: "Save notes" }).click();
     await expect(ownerPage.getByText("Shared runners are overloaded")).toBeVisible();
 
+    await ownerPage.getByRole("button", { name: "Start Actions" }).click();
+    await expect(stage(ownerPage)).toContainText("Actions");
+    await expect(memberPage.getByText("The facilitator records the actions the team agrees on.")).toBeVisible(LIVE);
+    await expect(memberPage.getByRole("button", { name: /^Add an action for/ })).toHaveCount(0);
     await ownerPage.getByRole("button", { name: "Close retrospective" }).click();
     await expect(stage(ownerPage)).toContainText("Closed");
     await expect(ownerPage.getByRole("heading", { name: "Most voted" })).toBeVisible();

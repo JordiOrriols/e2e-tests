@@ -7,7 +7,7 @@ const SECTIONS = [
   { tab: "Overview", path: "#/", placeholder: true },
   { tab: "Team Pulse", path: "#/team-pulse", placeholder: false },
   { tab: "Retrospectives", path: "#/retrospectives", placeholder: false },
-  { tab: "Actions", path: "#/actions", placeholder: true },
+  { tab: "Actions", path: "#/actions", placeholder: false },
 ];
 
 test.describe("Pulse shared header", () => {
