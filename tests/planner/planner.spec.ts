@@ -259,7 +259,7 @@ test("anonymous shared login exposes recovery and delegates it without sending r
   expect(recoveries).toBe(1);
 });
 
-test("Ladders shares a personal vacation link and its leave updates two multi-team plans", async ({ browser }) => {
+test("Ladders shares a personal vacation link and its leave follows the teams into the plan they move to", async ({ browser }) => {
   test.setTimeout(90_000);
   const owner = await signIn();
   const suffix = randomUUID().slice(0, 8);
@@ -299,9 +299,13 @@ test("Ladders shares a personal vacation link and its leave updates two multi-te
     await page.getByRole("checkbox", { name: `Design roster ${suffix}`, exact: true }).check();
     await page.getByRole("button", { name: "Save linked teams", exact: true }).click();
     await expect(page.getByLabel("Planning role for Grace", { exact: true })).toHaveValue("design");
+    // A team lives in one workspace, so moving both teams into the second plan empties the first.
     await api(owner, "rpc/planner_set_workspace_teams", {
       method: "POST", body: JSON.stringify({ workspace: workspaces[1], team_ids: [roster.team.id, extra.id] }),
     });
+    expect(await api(owner, "rpc/planner_workspace_roster", {
+      method: "POST", body: JSON.stringify({ workspace: workspaces[0] }),
+    })).toEqual([]);
 
     const laddersPage = await context.newPage();
     const laddersURL = new URL(process.env.LADDERS_LOCAL_URL ?? "http://localhost:5175");
@@ -335,12 +339,10 @@ test("Ladders shares a personal vacation link and its leave updates two multi-te
     await expect(vacationBadge(vacationPage, "2026-10-05", "Owner")).toBeVisible();
     expect(await vacationPage.evaluate(() => document.documentElement.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(2);
     await page.reload();
-    for (const name of ["First plan", "Second plan"]) {
-      await selectWorkspace(page, `${name} ${suffix}`);
-      await page.getByRole("link", { name: "Roadmap", exact: true }).click();
-      await setPlanStart(page, "2026-10-05");
-      await expect(page.getByLabel("Shared checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
-    }
+    await selectWorkspace(page, `Second plan ${suffix}`);
+    await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+    await setPlanStart(page, "2026-10-05");
+    await expect(page.getByLabel("Shared checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
     const availability = await api<{ member_id: string; date: string }[]>(owner, `vacations?member_id=eq.${roster.ownerMember.id}&select=member_id,date`);
     expect(availability).toHaveLength(2);
   } finally {
