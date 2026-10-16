@@ -6,7 +6,7 @@ import { PULSE_URL, openPulse, signIn } from "./pulse-helpers";
 const SECTIONS = [
   { tab: "Overview", path: "#/", placeholder: true },
   { tab: "Team Pulse", path: "#/team-pulse", placeholder: false },
-  { tab: "Retrospectives", path: "#/retrospectives", placeholder: true },
+  { tab: "Retrospectives", path: "#/retrospectives", placeholder: false },
   { tab: "Actions", path: "#/actions", placeholder: true },
 ];
 
