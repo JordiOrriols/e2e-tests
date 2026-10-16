@@ -33,21 +33,24 @@ test.describe("Planner workspace sharing", () => {
     contexts.push(ownerPage.context());
     await selectWorkspace(ownerPage, workspace.name);
     await expect(workspaceButton(ownerPage)).toContainText("Owner");
-    await ownerPage.getByRole("button", { name: "Share", exact: true }).click();
+    // The shared WorkspaceBar dialog shares per app and preselects Planner.
+    await ownerPage.getByTestId("workspace-share").click();
     const dialog = ownerPage.getByRole("alertdialog", { name: `Share ${workspace.name}` });
-    await expect(dialog).toContainText("This workspace has not been shared yet.");
+    await expect(dialog).toContainText("Not shared with anyone yet.");
     await dialog.getByLabel("Email", { exact: true }).fill(collaborator.user.email);
+    await expect(dialog.getByTestId("share-app-select")).toHaveValue("planner");
     await expect(dialog.getByLabel("Permission", { exact: true })).toHaveValue("viewer");
     await dialog.getByRole("button", { name: "Share", exact: true }).click();
-    const permission = dialog.getByLabel(`Permission for ${collaborator.user.email}`, { exact: true });
+    const permission = dialog.getByLabel(`Planner access for ${collaborator.user.email}`, { exact: true });
     await expect(permission).toHaveValue("viewer");
+    await expect(dialog.getByLabel(`Ladders access for ${collaborator.user.email}`, { exact: true })).toHaveValue("");
     await expect(dialog.getByLabel("Email", { exact: true })).toHaveValue("");
 
     // A viewer reads every page but gets no editing controls.
     const viewer = (await authenticatedPage(browser, collaborator)).page;
     contexts.push(viewer.context());
     await selectWorkspace(viewer, workspace.name);
-    await expect(workspaceButton(viewer)).toContainText("View");
+    await expect(workspaceButton(viewer)).toContainText("Viewer");
     await expect(viewer.getByRole("button", { name: "Share", exact: true })).toHaveCount(0);
     await expect(viewer.getByRole("article", { name: "Checkout", exact: true })).toBeVisible();
     await expect(viewer.getByText("Workspace owners and editors manage feature estimates and priorities.")).toBeVisible();
@@ -67,18 +70,42 @@ test.describe("Planner workspace sharing", () => {
     }))?.map(share => share.access_level)).toEqual(["editor"]);
     await viewer.getByRole("link", { name: "Estimation", exact: true }).click();
     await reopen(viewer, workspace.name);
-    await expect(workspaceButton(viewer)).toContainText("Edit");
+    await expect(workspaceButton(viewer)).toContainText("Editor");
     await expect(viewer.getByRole("button", { name: "New feature", exact: true })).toBeVisible();
     await expect(viewer.getByRole("button", { name: "Edit Checkout", exact: true })).toBeVisible();
     // Editors change the plan but never its sharing.
     await expect(viewer.getByRole("button", { name: "Share", exact: true })).toHaveCount(0);
 
     await dialog.getByRole("button", { name: `Remove ${collaborator.user.email}`, exact: true }).click();
-    await expect(dialog).toContainText("This workspace has not been shared yet.");
+    await expect(dialog).toContainText("Not shared with anyone yet.");
     await viewer.reload();
     await waitForWorkspace(viewer);
     await workspaceButton(viewer).click();
     await expect(viewer.getByRole("menuitemradio", { name: workspace.name, exact: true })).toHaveCount(0);
+  });
+
+  test("a share for another app does not open the workspace in Planner", async ({ browser }) => {
+    test.setTimeout(90_000);
+    const collaborator = await signIn(true);
+    const workspace = await createWorkspace(owner);
+    cleanup.push(() => removeWorkspace(owner, workspace.id));
+    const ownerPage = (await authenticatedPage(browser, owner)).page;
+    contexts.push(ownerPage.context());
+    await selectWorkspace(ownerPage, workspace.name);
+    await ownerPage.getByTestId("workspace-share").click();
+    const dialog = ownerPage.getByRole("alertdialog", { name: `Share ${workspace.name}` });
+    await dialog.getByLabel("Email", { exact: true }).fill(collaborator.user.email);
+    await dialog.getByTestId("share-app-select").selectOption("ladders");
+    await dialog.getByRole("button", { name: "Share", exact: true }).click();
+    await expect(dialog.getByLabel(`Ladders access for ${collaborator.user.email}`, { exact: true })).toHaveValue("viewer");
+    await expect(dialog.getByLabel(`Planner access for ${collaborator.user.email}`, { exact: true })).toHaveValue("");
+
+    const other = (await authenticatedPage(browser, collaborator)).page;
+    contexts.push(other.context());
+    await waitForWorkspace(other);
+    await workspaceButton(other).click();
+    await expect(other.getByRole("menuitem", { name: "New workspace", exact: true })).toBeVisible();
+    await expect(other.getByRole("menuitemradio", { name: workspace.name, exact: true })).toHaveCount(0);
   });
 
   test("the workspace menu creates a workspace and switches to it", async ({ browser }) => {
@@ -87,16 +114,20 @@ test.describe("Planner workspace sharing", () => {
     const { page, context } = await authenticatedPage(browser, owner);
     contexts.push(context);
     await waitForWorkspace(page);
+    // Read the title first: an open menu hides the rest of the page from the accessibility tree.
+    const current = await workspaceButton(page).getAttribute("title");
     await workspaceButton(page).click();
     await page.getByRole("menuitem", { name: "New workspace", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Your planning workspace" })).toBeVisible();
+    const create = page.getByRole("alertdialog", { name: "New workspace" });
     // Cancelling keeps the current workspace.
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
-    await waitForWorkspace(page);
+    await create.getByRole("button", { name: "Cancel", exact: true }).click();
+    await expect(create).toHaveCount(0);
+    await expect(workspaceButton(page)).toHaveAttribute("title", current!);
     await workspaceButton(page).click();
     await page.getByRole("menuitem", { name: "New workspace", exact: true }).click();
-    await page.getByLabel("Workspace name", { exact: true }).fill(name);
-    await page.getByRole("button", { name: "Create workspace", exact: true }).click();
+    await create.getByLabel("Name", { exact: true }).fill(name);
+    await create.getByRole("button", { name: "Create", exact: true }).click();
+    await expect(create).toHaveCount(0);
     await waitForWorkspace(page);
     await expect(workspaceButton(page)).toHaveAttribute("title", name);
     await expect(workspaceButton(page)).toContainText("Owner");

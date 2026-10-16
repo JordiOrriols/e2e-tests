@@ -25,11 +25,16 @@ test("estimates, priority scheduling, workspace teams and token vacations persis
   try {
     await expect(page.getByRole("heading", { name: /Feature estimation|Your planning workspace/ })).toBeVisible();
     if (await page.getByRole("button", { name: "Workspace", exact: true }).isVisible()) {
+      // With workspaces already listed, the shared workspace menu opens its name dialog.
       await page.getByRole("button", { name: "Workspace", exact: true }).click();
       await page.getByRole("menuitem", { name: "New workspace" }).click();
+      const create = page.getByRole("alertdialog", { name: "New workspace" });
+      await create.getByLabel("Name", { exact: true }).fill(workspaceName);
+      await create.getByRole("button", { name: "Create", exact: true }).click();
+    } else {
+      await page.getByLabel("Workspace name").fill(workspaceName);
+      await page.getByRole("button", { name: "Create workspace", exact: true }).click();
     }
-    await page.getByLabel("Workspace name").fill(workspaceName);
-    await page.getByRole("button", { name: "Create workspace", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Feature estimation" })).toBeVisible();
     const workspaces = await api<{ id: string }[]>(owner, `workspaces?name=eq.${encodeURIComponent(workspaceName)}&created_for_team=is.false&select=id`);
     workspaceId = workspaces?.[0]?.id;
