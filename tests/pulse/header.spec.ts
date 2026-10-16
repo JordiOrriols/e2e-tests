@@ -2,11 +2,12 @@ import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { expectProjectSwitcher } from "../shared/app-header";
 import { PULSE_URL, openPulse, signIn } from "./pulse-helpers";
 
+/** Sections still waiting for their own page show the shared placeholder. */
 const SECTIONS = [
-  { tab: "Overview", path: "#/" },
-  { tab: "Team Pulse", path: "#/team-pulse" },
-  { tab: "Retrospectives", path: "#/retrospectives" },
-  { tab: "Actions", path: "#/actions" },
+  { tab: "Overview", path: "#/", placeholder: true },
+  { tab: "Team Pulse", path: "#/team-pulse", placeholder: false },
+  { tab: "Retrospectives", path: "#/retrospectives", placeholder: true },
+  { tab: "Actions", path: "#/actions", placeholder: true },
 ];
 
 test.describe("Pulse shared header", () => {
@@ -30,7 +31,7 @@ test.describe("Pulse shared header", () => {
       await tabs.getByRole("link", { name: section.tab, exact: true }).click();
       await expect(page).toHaveURL(new RegExp(`${section.path.replace("/", "\\/")}$`));
       await expect(page.getByRole("main").getByRole("heading", { name: section.tab, level: 1 })).toBeVisible();
-      await expect(page.getByText("Nothing here yet")).toBeVisible();
+      await expect(page.getByText("Nothing here yet")).toHaveCount(section.placeholder ? 1 : 0);
     }
   });
 
