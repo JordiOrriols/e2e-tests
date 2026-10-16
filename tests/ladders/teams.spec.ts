@@ -19,6 +19,7 @@ test.describe("Ladders teams @teams @smoke", () => {
     await seedMember(data, "E2E Seed For Create");
     await app.gotoHome();
     await app.createTeam(name);
+    await data.adoptTeam(name);
 
     await expect(app.teamSectionByName(name)).toBeVisible();
   });

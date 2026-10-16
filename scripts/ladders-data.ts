@@ -225,6 +225,13 @@ export class LaddersData {
     return team;
   }
 
+  /** Registers a team created through the UI so cleanup removes it too. */
+  async adoptTeam(name: string): Promise<void> {
+    const team = (await this.listTeams()).find((t) => t.name === name);
+    if (!team) throw new Error(`Team ${name} was not created`);
+    this.createdTeams.add(team.id);
+  }
+
   async deleteTeam(id: string): Promise<void> {
     await this.request(`teams?id=eq.${id}`, { method: "DELETE" });
   }
