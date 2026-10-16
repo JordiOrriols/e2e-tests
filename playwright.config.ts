@@ -81,8 +81,10 @@ export default defineConfig({
       testDir: "./tests/planner",
       /*
        * Unlike ladders, most planner assertions follow a save that refetches the
-       * workspace from the remote Supabase, which can take several seconds.
+       * workspace from the remote Supabase, which can take several seconds, and
+       * each test seeds its own teams and workspace through that same API.
        */
+      timeout: 60_000,
       expect: { timeout: 10_000 },
       use: {
         ...devices["Desktop Chrome"],
