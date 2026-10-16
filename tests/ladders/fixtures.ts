@@ -7,7 +7,7 @@ import {
 import { LaddersData } from "../../scripts/ladders-data";
 import { SECOND_STATE_PATH } from "../../scripts/ladders-auth";
 import { projectConfigs } from "../../playwright.config";
-import { LaddersApp } from "./ladders-app";
+import { LaddersApp, waitForData } from "./ladders-app";
 
 /**
  * Ladders fixtures.
@@ -91,6 +91,7 @@ export const test = base.extend<{
         const target = new URL(path, projectConfigs.ladders.localhost).href;
         if (page.url() === target) await page.reload();
         else await page.goto(path);
+        await waitForData(page);
       },
     });
     await context.close();
@@ -110,6 +111,7 @@ export const test = base.extend<{
         const target = new URL(path, projectConfigs.ladders.localhost).href;
         if (page.url() === target) await page.reload();
         else await page.goto(path);
+        await waitForData(page);
       },
     });
     await context.close();

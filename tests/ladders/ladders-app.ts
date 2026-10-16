@@ -54,6 +54,20 @@ export function ladderPath(path: string): string {
   return clean ? `/#/${clean}` : "/#/";
 }
 
+/**
+ * Waits for the app to finish its first Supabase round trip.
+ *
+ * Against the Vite dev server and the shared Supabase project, a cold page
+ * shows its "Loading..." skeleton for several seconds when the suite runs in
+ * parallel, which used to eat the whole 5s assertion budget of the next step.
+ */
+export async function waitForData(page: Page): Promise<void> {
+  await expect(page.locator("#root > *").first()).toBeAttached();
+  await expect(page.getByRole("status", { name: "Loading..." })).toHaveCount(0, {
+    timeout: DATA_TIMEOUT,
+  });
+}
+
 export class LaddersApp {
   readonly page: Page;
 
@@ -64,12 +78,14 @@ export class LaddersApp {
   /** Navigate home and wait until the tabs have rendered. */
   async gotoHome(): Promise<void> {
     await this.page.goto("/");
+    await waitForData(this.page);
     await expect(this.page.getByTestId("main-tabs")).toBeVisible();
   }
 
   /** Opens a hash route directly, for the screens that live outside the tabs. */
   async goto(path: string): Promise<void> {
     await this.page.goto(path);
+    await waitForData(this.page);
   }
 
   get teamTab(): Locator {
