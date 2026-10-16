@@ -4,6 +4,7 @@ import { expect, type Page } from "@playwright/test";
 export const PROJECTS = [
   { id: "ladders", name: "Ladders", url: "https://ladders.jordiorriols.cat/", icon: "lucide-trending-up" },
   { id: "planner", name: "Planner", url: "https://planner.jordiorriols.cat/", icon: "lucide-square-chart-gantt" },
+  { id: "pulse", name: "Pulse", url: "https://pulse.jordiorriols.cat/", icon: "lucide-heart-pulse" },
 ] as const;
 
 const iconClass = (svg: Element) =>
