@@ -4,7 +4,7 @@ import { PULSE_URL, openPulse, signIn } from "./pulse-helpers";
 
 /** Sections still waiting for their own page show the shared placeholder. */
 const SECTIONS = [
-  { tab: "Overview", path: "#/", placeholder: true },
+  { tab: "Overview", path: "#/", placeholder: false },
   { tab: "Team Pulse", path: "#/team-pulse", placeholder: false },
   { tab: "Retrospectives", path: "#/retrospectives", placeholder: false },
   { tab: "Actions", path: "#/actions", placeholder: false },
