@@ -55,11 +55,11 @@ const DEFAULT_ROSTER: RosterMember[] = [
 
 /**
  * A Ladders team with members; the first member is returned as `ownerMember`. Teams stay in the
- * workspace they are created in: pass one to plan with the team, or it gets a workspace of its own.
+ * workspace they are created in.
  */
-export async function createRoster(account: Account, name: string, people: RosterMember[] = DEFAULT_ROSTER, workspace?: string) {
+export async function createRoster(account: Account, name: string, people: RosterMember[] = DEFAULT_ROSTER, workspace: string) {
   const team = await api<{ id: string }>(account, "rpc/create_team", {
-    method: "POST", body: JSON.stringify(workspace ? { p_name: name, p_workspace: workspace } : { p_name: name }),
+    method: "POST", body: JSON.stringify({ p_name: name, p_workspace: workspace }),
   });
   if (!team) throw new Error("Ladders team creation returned no row");
   try {

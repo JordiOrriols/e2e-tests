@@ -136,9 +136,9 @@ test("estimates, priority scheduling, workspace teams and token vacations persis
     // Oct 12 is a Barcelona holiday, so five working days after the leave end on Oct 14.
     await expect(page.getByLabel("Checkout: Oct 7, 2026 to Oct 14, 2026", { exact: true })).toBeVisible();
 
-    await api(owner, "rpc/share_team_by_email", {
+    await api(owner, "rpc/share_workspace", {
       method: "POST",
-      body: JSON.stringify({ p_team_id: roster.team.id, p_email: collaborator.user.email, p_access: "viewer" }),
+      body: JSON.stringify({ workspace: workspaceId, account_email: collaborator.user.email, app_name: "ladders", access: "viewer" }),
     });
 
     const second = await authenticatedPage(browser, collaborator);
@@ -150,8 +150,8 @@ test("estimates, priority scheduling, workspace teams and token vacations persis
     await showMonth(second.page, "2026-10-05");
     await expect(calendarDay(second.page, "2026-10-08")).toBeDisabled();
     await expect(second.page.getByRole("button", { name: "Vacations", exact: true })).toBeDisabled();
-    await second.page.getByRole("link", { name: "Team configuration", exact: true }).click();
-    await expect(second.page.getByLabel("Planning role for Owner")).toBeDisabled();
+    // Team configuration is for editors only, so viewers do not get the tab at all.
+    await expect(second.page.getByRole("link", { name: "Team configuration", exact: true })).toHaveCount(0);
     await expect(second.page.getByRole("button", { name: /Copy vacation link/ })).toHaveCount(0);
     await expect(api(collaborator, "rpc/planner_set_vacations", {
       method: "POST", body: JSON.stringify({ member: roster.ownerMember.id, start_date: "2026-10-08", end_date: "2026-10-08", working: false }),
