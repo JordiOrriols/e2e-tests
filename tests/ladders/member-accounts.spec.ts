@@ -32,7 +32,9 @@ test.describe("Ladders member accounts @sharing", () => {
     await app.openTeamMember(member.name);
     await page.getByTestId(MENU).click();
     await page.getByTestId("split-item-member_share_account_invite").click();
-    await expect(page.getByTestId("alert-modal")).toContainText("Invite copied.");
+    await expect(page.getByTestId("alert-modal")).toContainText(
+      "Invite copied.",
+    );
     await page.getByTestId("alert-modal-close").click();
     const invite = await page.evaluate(() => navigator.clipboard.readText());
     expect(invite).toMatch(/^http:\/\/localhost:5175\/#\/join\/[0-9a-f-]{36}$/);
@@ -42,22 +44,38 @@ test.describe("Ladders member accounts @sharing", () => {
     await expect(collaborator.page.getByTestId("join-invite")).toContainText(
       `You were invited as ${member.name} in the ${workspace.name} workspace.`,
     );
-    await collaborator.page.getByRole("button", { name: "Link my account" }).click();
-    await expect(collaborator.page.getByTestId("member-home-tab")).toContainText(member.name);
-    await expect(collaborator.page.getByTestId("workspace-switcher")).toContainText("Member");
+    await collaborator.page
+      .getByRole("button", { name: "Link my account" })
+      .click();
+    await expect(
+      collaborator.page.getByTestId("member-home-tab"),
+    ).toContainText(member.name);
+    await expect(
+      collaborator.page.getByTestId("workspace-switcher"),
+    ).toContainText("Member");
     await expect(collaborator.page.getByTestId("main-tabs")).toHaveCount(0);
 
     // The invite works once.
     await collaborator.open(`/#${path}`);
-    await expect(collaborator.page.getByText("This invite was already used or has expired.")).toBeVisible();
+    await expect(
+      collaborator.page.getByText(
+        "This invite was already used or has expired.",
+      ),
+    ).toBeVisible();
 
     await page.reload();
     await page.getByTestId(MENU).click();
-    await expect(page.getByTestId("split-item-member_share_account_invite")).toHaveCount(0);
+    await expect(
+      page.getByTestId("split-item-member_share_account_invite"),
+    ).toHaveCount(0);
     await page.getByTestId("split-item-member_share_account_unlink").click();
-    await expect(page.getByTestId("alert-modal")).toContainText("no longer linked");
+    await expect(page.getByTestId("alert-modal")).toContainText(
+      "no longer linked",
+    );
     await page.getByTestId("alert-modal-close").click();
     await page.getByTestId(MENU).click();
-    await expect(page.getByTestId("split-item-member_share_account_invite")).toBeVisible();
+    await expect(
+      page.getByTestId("split-item-member_share_account_invite"),
+    ).toBeVisible();
   });
 });
