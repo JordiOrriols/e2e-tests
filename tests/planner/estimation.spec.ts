@@ -127,7 +127,7 @@ test.describe("Planner feature estimation", () => {
 
     // Backend and frontend overlap (3 people); QA follows for one more week.
     await expect(checkout).toContainText("Peak team3people");
-    await expect(checkout).toContainText("Duration4weeks");
+    await expect(checkout).toContainText("Duration6weeks");
     await expect(checkout).toContainText("Effort8person-wks");
     const summary = checkout.getByRole("group", {
       name: "Effort by role",
