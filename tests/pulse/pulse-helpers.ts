@@ -29,6 +29,7 @@ export const workspaceButton = (page: Page) => page.getByRole("button", { name: 
 
 export async function selectWorkspace(page: Page, name: string) {
   await expect(workspaceButton(page)).toBeVisible({ timeout: 15_000 });
+  await expect(workspaceButton(page)).toHaveAttribute("title", /.+/, { timeout: 15_000 });
   await workspaceButton(page).click();
   await page.getByRole("menuitemradio", { name, exact: true }).click();
   await expect(workspaceButton(page)).toHaveAttribute("title", name);
