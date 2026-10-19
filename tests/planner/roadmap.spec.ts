@@ -59,15 +59,15 @@ test.describe("Planner roadmap", () => {
     await openRoadmap(page, workspace.name, "2026-02-02");
 
     // Both backends take the first feature, then split over the two single-backend features.
-    await expect(span(page, "Back Task: Feb 2, 2026 to Feb 13, 2026")).toBeVisible();
-    await expect(span(page, "1 Back Task Second: Feb 16, 2026 to Feb 27, 2026")).toBeVisible();
-    await expect(span(page, "1 Back Task: Feb 16, 2026 to Feb 27, 2026")).toBeVisible();
+    await expect(span(page, "Back Task: Feb 2, 2026 to Feb 27, 2026")).toBeVisible();
+    await expect(span(page, "1 Back Task Second: Feb 16, 2026 to Mar 13, 2026")).toBeVisible();
+    await expect(span(page, "1 Back Task: Feb 16, 2026 to Mar 13, 2026")).toBeVisible();
     // The frontend is free from day one, so Mixed starts its frontend work while the backends are busy,
     // pauses, and resumes when both backends are free. Front then takes the frontend after it.
-    await expect(span(page, "Mixed Project: Feb 2, 2026 to Mar 13, 2026")).toBeVisible();
-    await expect(span(page, "Front: Feb 16, 2026 to Feb 27, 2026")).toBeVisible();
+    await expect(span(page, "Mixed Project: Feb 2, 2026 to Mar 27, 2026")).toBeVisible();
+    await expect(span(page, "Front: Feb 16, 2026 to Mar 13, 2026")).toBeVisible();
     await expect(page.getByRole("heading", { name: /Schedule · 6\/6 completed/ })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Roadmap finishes" })).toContainText("Mar 13, 2026");
+    await expect(page.getByRole("region", { name: "Roadmap finishes" })).toContainText("Mar 27, 2026");
 
     // A role working two weeks in a row is one connected bar, with the exact people and effort.
     await expect(roleRuns(page, "Back Task", "Backend")).toHaveCount(1);
@@ -81,7 +81,7 @@ test.describe("Planner roadmap", () => {
       "Mixed Project · Frontend: Feb 2, 2026 to Feb 13, 2026 · 1 person requested · 2.0 person-weeks");
 
     // Backend is the top half and frontend the bottom half of the feature bar.
-    const mixedBar = await box(span(page, "Mixed Project: Feb 2, 2026 to Mar 13, 2026"));
+    const mixedBar = await box(span(page, "Mixed Project: Feb 2, 2026 to Mar 27, 2026"));
     const back = await box(mixedBack);
     const front = await box(mixedFront);
     expect(back.y).toBeCloseTo(mixedBar.y, 0);
@@ -90,9 +90,10 @@ test.describe("Planner roadmap", () => {
     expect(front.height).toBeCloseTo(mixedBar.height / 2, 0);
     // The idle weeks in between stay as the gray feature bar: no role bar covers them.
     expect(front.x).toBeCloseTo(mixedBar.x, 0);
-    expect(back.x + back.width).toBeCloseTo(mixedBar.x + mixedBar.width, 0);
-    expect(back.x - (front.x + front.width)).toBeGreaterThan(mixedBar.width / 4);
-    await expect(span(page, "Mixed Project: Feb 2, 2026 to Mar 13, 2026")).toHaveClass(/bg-slate-400/);
+    expect(back.x + back.width).toBeLessThan(mixedBar.x + mixedBar.width);
+    expect(back.x - (front.x + front.width)).toBeGreaterThan(mixedBar.width / 5);
+    await expect(span(page, "Mixed Project: Feb 2, 2026 to Mar 27, 2026")).toHaveClass(/bg-slate-400/);
+    await expect(page.getByRole("img", { name: "UAT: Mar 14, 2026 to Mar 27, 2026", exact: true })).toBeVisible();
 
     // Design and QA fill the full height, and QA only starts after design is done.
     const design = await box(roleRuns(page, "Polish", "Design"));
@@ -136,7 +137,7 @@ test.describe("Planner roadmap", () => {
       .dragTo(page.getByRole("button", { name: "Reorder Refunds", exact: true }));
     await expect.poll(() => rowOrder(page)).toEqual(["Checkout", "Indexing", "Refunds"]);
     await expect(schedule.getByRole("heading", { level: 3 })).toHaveText(["Payments", "Search", "Payments"]);
-    await expect(span(page, "Indexing: Feb 9, 2026 to Feb 13, 2026")).toBeVisible();
+    await expect(span(page, "Indexing: Feb 9, 2026 to Feb 27, 2026")).toBeVisible();
     await page.reload();
     await selectWorkspace(page, workspace.name);
     await expect.poll(() => rowOrder(page)).toEqual(["Checkout", "Indexing", "Refunds"]);
