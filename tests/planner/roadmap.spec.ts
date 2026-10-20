@@ -10,7 +10,13 @@ async function openRoadmap(page: Page, workspaceName: string, start: string) {
   await page.getByRole("link", { name: "Roadmap", exact: true }).click();
   await setPlanStart(page, start);
 }
-const span = (page: Page, label: string) => page.getByRole("group", { name: label, exact: true });
+const span = (page: Page, label: string, status = "Pending") =>
+  page.getByRole("group", { name: `${label} · ${status}`, exact: true });
+
+async function setStatusFromMenu(page: Page, feature: string, status: string) {
+  await page.getByLabel(`Schedule row: ${feature}`, { exact: true }).click({ button: "right", position: { x: 40, y: 12 } });
+  await page.getByRole("menuitemradio", { name: status, exact: true }).click();
+}
 /** Every continuous run a role works on a feature is one bar; returns them all. */
 const roleRuns = (page: Page, feature: string, role: string) =>
   page.getByRole("img", { name: new RegExp(`^${feature} · ${role}: `) });
@@ -104,7 +110,7 @@ test.describe("Planner roadmap", () => {
     expect(qa.x).toBeGreaterThanOrEqual(design.x + design.width - 1);
   });
 
-  test("rows reorder by drag and drop, are delivered from the context menu and group by main project", async ({ browser }) => {
+  test("rows reorder by drag and drop, change status and group by main project", async ({ browser }) => {
     test.setTimeout(90_000);
     const workspace = await createWorkspace(owner);
     cleanup.push(() => removeWorkspace(owner, workspace.id));
@@ -142,13 +148,29 @@ test.describe("Planner roadmap", () => {
     await selectWorkspace(page, workspace.name);
     await expect.poll(() => rowOrder(page)).toEqual(["Checkout", "Indexing", "Refunds"]);
 
-    // Delivery is a context-menu action on the whole row, and it can be undone.
-    await roadmapRowAction(page, "Checkout", "Mark delivered");
-    await expect(page.getByRole("group", { name: /^Checkout: .* · Delivered$/ })).toBeVisible();
+    // Status changes from the row menu or the status dot, and persists.
+    await setStatusFromMenu(page, "Checkout", "Done");
+    await expect(page.getByRole("group", { name: /^Checkout: .* · Done$/ })).toBeVisible();
     await expect(page.getByRole("img", { name: /^Checkout · / })).toHaveCount(0);
-    await roadmapRowAction(page, "Checkout", "Undo delivery");
-    await expect(page.getByRole("group", { name: /^Checkout: .* · Delivered$/ })).toHaveCount(0);
-    await expect(page.getByRole("group", { name: /^Checkout: / })).toBeVisible();
+    await page.getByRole("button", { name: "Change status of Refunds", exact: true }).click();
+    await page.getByRole("menuitemradio", { name: "Paused", exact: true }).click();
+    await expect(page.getByRole("group", { name: /^Refunds: .* · Paused$/ }).locator("..")).toHaveClass(/opacity-50/);
+    await page.reload();
+    await selectWorkspace(page, workspace.name);
+    await expect(page.getByRole("group", { name: /^Checkout: .* · Done$/ })).toBeVisible();
+    await expect(page.getByRole("group", { name: /^Refunds: .* · Paused$/ })).toBeVisible();
+    await setStatusFromMenu(page, "Checkout", "In progress");
+    await expect(page.getByRole("group", { name: /^Checkout: .* · In progress$/ })).toBeVisible();
+    await expect(page.getByRole("img", { name: /^Checkout · / }).first()).toBeVisible();
+
+    // Display toggles widen the page and the name column.
+    const main = page.locator("main");
+    const narrow = (await main.boundingBox())!.width;
+    await page.getByRole("button", { name: "Full width", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Full width", exact: true })).toHaveAttribute("aria-pressed", "true");
+    await expect.poll(async () => (await main.boundingBox())!.width).toBeGreaterThanOrEqual(narrow);
+    await page.getByRole("button", { name: "Wrap titles", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Wrap titles", exact: true })).toHaveAttribute("aria-pressed", "true");
     // The schedule no longer offers reorder or delete buttons outside the rows themselves.
     await expect(page.getByRole("button", { name: /^(Move|Remove|Delete) / })).toHaveCount(0);
   });

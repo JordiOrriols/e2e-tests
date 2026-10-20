@@ -66,17 +66,32 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
     ]);
     expect(Object.keys(payload.features[0]).sort()).toEqual([
       "complete",
-      "delivered",
       "end",
       "name",
       "project",
       "start",
+      "status",
     ]);
     await expect(
       page.getByRole("img", {
-        name: "Checkout: Feb 2, 2026 to Feb 20, 2026",
+        name: "Checkout: Feb 2, 2026 to Feb 20, 2026 · Pending",
         exact: true,
       }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "Status: Pending", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('[data-guide="week"]').first()).toBeAttached();
+    await expect(page.getByTestId("app-footer")).toBeVisible();
+    await page.getByRole("button", { name: "Language", exact: true }).click();
+    await page.getByTestId("language-button-es").click();
+    await expect(
+      page.getByRole("button", { name: "Ancho completo", exact: true }),
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Idioma", exact: true }).click();
+    await page.getByTestId("language-button-en").click();
+    await expect(
+      page.getByRole("button", { name: "Full width", exact: true }),
     ).toBeVisible();
     await expect(page.getByText("Private person")).toHaveCount(0);
     await expect(
@@ -97,7 +112,7 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
     await page.reload();
     await expect(
       page.getByRole("img", {
-        name: "Checkout: Feb 2, 2026 to Feb 27, 2026",
+        name: "Checkout: Feb 2, 2026 to Feb 27, 2026 · Pending",
         exact: true,
       }),
     ).toBeVisible();
