@@ -78,9 +78,10 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
         exact: true,
       }),
     ).toBeVisible();
+    await expect(page.getByRole("img", { name: /^Status: / })).toHaveCount(0);
     await expect(
-      page.getByRole("img", { name: "Status: Pending", exact: true }),
-    ).toBeVisible();
+      page.getByRole("img", { name: /^Checkout: .* · Pending$/ }),
+    ).toHaveClass(/bg-slate-400/);
     await expect(page.locator('[data-guide="week"]').first()).toBeAttached();
     await expect(page.getByTestId("app-footer")).toBeVisible();
     await page.getByRole("button", { name: "Language", exact: true }).click();
