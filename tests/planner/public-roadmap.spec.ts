@@ -61,6 +61,7 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
     const payload = await response.json();
     expect(Object.keys(payload).sort()).toEqual([
       "features",
+      "markers",
       "name",
       "startDate",
     ]);
