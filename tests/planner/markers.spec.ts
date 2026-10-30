@@ -102,16 +102,15 @@ test("date markers can be managed, shared and toggled for only the browser sessi
       .click();
     await expect(launch).toBeVisible();
 
+    await page.getByTestId("workspace-share").click();
     await page
-      .getByRole("button", { name: "Share roadmap", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Create share link", exact: true })
+      .getByRole("button", { name: "Enable public link", exact: true })
       .click();
     const link = await page
-      .getByRole("textbox", { name: "Public roadmap link", exact: true })
+      .getByRole("textbox", { name: "Public link", exact: true })
       .inputValue();
-    await page.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page.getByTestId("share-workspace-dialog")
+      .getByRole("button", { name: "Close", exact: true }).click();
     const anonymous = await browser.newContext();
     contexts.push(anonymous);
     const publicPage = await anonymous.newPage();
