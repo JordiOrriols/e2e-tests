@@ -103,6 +103,7 @@ test("date markers can be managed, shared and toggled for only the browser sessi
     await expect(launch).toBeVisible();
 
     await page.getByTestId("workspace-share").click();
+    await page.getByRole("tab", { name: "Link", exact: true }).click();
     await page
       .getByRole("button", { name: "Enable public link", exact: true })
       .click();
