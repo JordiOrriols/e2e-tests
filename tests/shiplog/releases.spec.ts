@@ -76,6 +76,10 @@ test("one workspace release catalog contains multiple apps, filters and never ex
     await expect(
       sharing.getByRole("region", { name: "People with access" }),
     ).toBeVisible();
+    await expect(sharing.getByRole("tab", { name: "Emails", exact: true }))
+      .toHaveAttribute("aria-selected", "true");
+    await expect(sharing.getByRole("region", { name: "Public link" })).toHaveCount(0);
+    await sharing.getByRole("tab", { name: "Link", exact: true }).click();
     await expect(
       sharing.getByRole("region", { name: "Public link" }),
     ).toBeVisible();
@@ -177,17 +181,32 @@ test("Shiplog reuses workspace sharing and account sign-out controls", async ({
       "viewer",
     );
     await expect(dialog).toContainText("Not shared with anyone yet.");
+    await expect(dialog.getByRole("tab", { name: "Emails", exact: true }))
+      .toHaveAttribute("aria-selected", "true");
+    const email = dialog.getByLabel("Email", { exact: true });
+    await email.fill("draft@example.com");
     await page.setViewportSize({ width: 390, height: 844 });
     await expect.poll(async () => (await dialog.boundingBox())!.width)
       .toBeCloseTo(358, 0);
     const bounds = (await dialog.boundingBox())!;
     expect(bounds.x).toBeGreaterThanOrEqual(15);
     expect(bounds.height).toBeLessThanOrEqual(844 * 0.7 + 1);
+    await dialog.getByRole("tab", { name: "Link", exact: true }).click();
     await dialog.getByRole("button", { name: "Enable public link", exact: true })
       .scrollIntoViewIfNeeded();
     await expect(dialog.getByRole("button", { name: "Close", exact: true }))
       .toBeInViewport();
     await page.screenshot({ path: test.info().outputPath("mobile-sharing.png") });
+    await dialog.getByRole("tab", { name: "Link", exact: true }).focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(dialog.getByRole("tab", { name: "Emails", exact: true }))
+      .toHaveAttribute("aria-selected", "true");
+    await expect(email).toHaveValue("draft@example.com");
+    await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await page.getByTestId("workspace-share").click();
+    await expect(dialog.getByRole("tab", { name: "Emails", exact: true }))
+      .toHaveAttribute("aria-selected", "true");
+    await expect(email).toHaveValue("");
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
     await page.setViewportSize({ width: 1280, height: 720 });
     await page.goto(`${baseURL}/#/portal`);
