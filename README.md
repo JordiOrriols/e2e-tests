@@ -10,6 +10,7 @@ End-to-end testing repository for jordiorriols projects using Playwright.
 | Airmap | https://airmap.jordiorriols.cat | http://localhost:5174 |
 | Ladders | https://ladders.jordiorriols.cat | http://localhost:5175 |
 | Planner | Not configured | http://127.0.0.1:5176 |
+| Shiplog | Not configured | http://127.0.0.1:5178 |
 
 ## Setup
 
@@ -56,6 +57,14 @@ controls, typography/icon sizes and mobile navigation. They create unique
 workspaces and Ladders teams/members, and delete only their own test data.
 Apply Planner's shared-team/vacation migration to the shared Supabase project
 before running the updated tests; both apps must use the same project.
+
+Start Shiplog's server on port 5178 and run
+`npx playwright test --project=shiplog-localhost --workers=1`. This suite uses
+the same account/environment helpers. It covers the Details/Changes/QA release
+tabs, atomic detail/status saves, multiple same-workspace Planner feature links,
+unlinking and reload persistence, Draft-only feature editing, name-only public
+output, QA/approvals, workspace sharing and mobile modal controls. Apply Shiplog's
+`20261031000000_shiplog_planner_features.sql` migration before running it.
 
 ### By Environment
 ```bash

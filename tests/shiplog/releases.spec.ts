@@ -3,6 +3,7 @@ import {
   api,
   authenticatedPage,
   createWorkspace,
+  ensureProject,
   removeWorkspace,
   selectWorkspace,
   signIn,
@@ -222,14 +223,27 @@ test("Shiplog reuses workspace sharing and account sign-out controls", async ({
   }
 });
 
-test("draft changes persist, public catalogs include drafts safely, and editing follows manual release status", async ({
+test("release details and linked Planner features persist, public names stay safe, and changes lock outside Draft", async ({
   browser,
 }) => {
   test.setTimeout(150_000);
   const owner = await signIn();
   const workspace = await createWorkspace(owner, `Shiplog draft ${Date.now()}`);
   const contexts: BrowserContext[] = [];
+  let otherWorkspace: { id: string; name: string } | undefined;
   try {
+    const project = await ensureProject(owner, workspace.id);
+    const features = await api<{ id: string; name: string }[]>(owner, "features", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify(["New calendar", "Major roadmap", "Temporary feature"].map(name => ({
+        project_id: project, name, description: "SECRET private Planner details", in_backlog: true,
+      }))),
+    });
+    expect(features).toHaveLength(3);
+    otherWorkspace = await createWorkspace(owner, `Other release features ${Date.now()}`);
+    const otherProject = await ensureProject(owner, otherWorkspace.id);
+    await api(owner, "features", { method:"POST", body:JSON.stringify({ project_id:otherProject,name:"SECRET other workspace feature",in_backlog:true }) });
     const application = await api<{ id: string }>(
       owner,
       "rpc/shiplog_save_application",
@@ -266,67 +280,39 @@ test("draft changes persist, public catalogs include drafts safely, and editing 
     await selectWorkspace(page, workspace.name);
     await page.getByRole("link", { name: "Releases", exact: true }).click();
     await page.getByRole("button", { name: /1\.0\.0\s*Draft launch/ }).click();
-    await page.getByRole("button", { name: "Edit draft", exact: true }).click();
+    await expect(page.getByRole("tab")).toHaveText(["Details", "Changes", "QA"]);
+    await expect(page.getByRole("tab", { name: "Details", exact: true })).toHaveAttribute("aria-selected", "true");
     await page.getByLabel("Version", { exact: true }).fill("1.1.0");
     await page.getByLabel("Title", { exact: true }).fill("Updated launch");
     await page
       .getByLabel("Public release notes", { exact: true })
       .fill("New public notes");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("tab", { name:"Changes",exact:true }).click();
+    await expect(page.getByLabel("Release status", { exact:true })).toBeHidden();
+    await page.getByRole("tab", { name:"Details",exact:true }).click();
+    await expect(page.getByLabel("Title", { exact:true })).toHaveValue("Updated launch");
+    const save = page.getByRole("button", { name: "Save", exact: true });
+    await expect(save).toHaveAttribute("form", "release-details-form");
+    await expect(save).toHaveCSS("background-color", "oklch(0.205 0 0)");
+    await expect(page.locator("#release-details-form button[type=submit]")).toHaveCount(0);
+    await save.click();
     await expect(
       page.getByRole("heading", {
         name: "1.1.0 — Updated launch",
         exact: true,
       }),
     ).toBeVisible();
-    for (const [title, isPublic] of [
-      ["New calendar", true],
-      ["SECRET internal migration", false],
-      ["Temporary change", false],
-    ] as const) {
-      await page
-        .getByRole("button", { name: "Add change", exact: true })
-        .click();
-      await page.getByLabel("Title", { exact: true }).fill(title);
-      await page
-        .getByLabel("Description", { exact: true })
-        .fill(`${title} details`);
-      const checkbox = page.getByRole("checkbox", {
-        name: "Public change",
-        exact: true,
-      });
-      await expect(checkbox).not.toBeChecked();
-      if (isPublic) await checkbox.check();
-      await page.getByRole("button", { name: "Save", exact: true }).click();
-      await expect(page.getByText(title, { exact: true })).toBeVisible();
+    await page.getByRole("tab", { name:"Changes",exact:true }).click();
+    await expect(page.getByLabel("Planner feature")).toBeEnabled();
+    await expect(page.getByRole("option", { name:"SECRET other workspace feature",exact:true })).toHaveCount(0);
+    for (const name of ["New calendar", "Major roadmap", "Temporary feature"]) {
+      await page.getByLabel("Planner feature").selectOption({ label:name });
+      await page.getByRole("button", { name:"Link feature",exact:true }).click();
+      await expect(page.getByRole("button", { name:`Unlink ${name}`,exact:true })).toBeVisible();
     }
-    await page
-      .getByRole("button", { name: "Edit change New calendar", exact: true })
-      .click();
-    await page
-      .getByLabel("Category", { exact: true })
-      .selectOption("improvement");
-    await page.getByLabel("Title", { exact: true }).fill("Improved calendar");
-    await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(
-      page.getByText("Improved calendar", { exact: true }),
-    ).toBeVisible();
-    await page
-      .getByRole("button", {
-        name: "Delete change Temporary change",
-        exact: true,
-      })
-      .click();
-    await page
-      .getByRole("alertdialog", {
-        name: "Delete change Temporary change",
-        exact: true,
-      })
-      .getByRole("button", { name: "Delete", exact: true })
-      .click();
-    await expect(
-      page.getByText("Temporary change", { exact: true }),
-    ).toHaveCount(0);
+    await page.getByRole("button", { name:"Unlink Temporary feature",exact:true }).click();
+    await expect(page.getByRole("button", { name:"Unlink Temporary feature",exact:true })).toHaveCount(0);
+    await expect(page.getByRole("checkbox", { name:"Public change",exact:true })).toHaveCount(0);
     for (const name of ["Public preview", "Approvals", "Deployments"]) await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
     await page.screenshot({
       path: test.info().outputPath("release-details.png"),
@@ -336,7 +322,7 @@ test("draft changes persist, public catalogs include drafts safely, and editing 
     await expect(
       page.getByRole("button", { name: "Close", exact: true }),
     ).toBeInViewport();
-    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Link feature", exact: true })).toBeInViewport();
     await expect(
       page.getByRole("heading", {
         name: "1.1.0 — Updated launch",
@@ -348,7 +334,7 @@ test("draft changes persist, public catalogs include drafts safely, and editing 
       fullPage: true,
     });
     await page.setViewportSize({ width: 1280, height: 720 });
-    const anonymous = await browser.newContext();
+    const anonymous = await browser.newContext({ storageState:{ cookies:[],origins:[] } });
     contexts.push(anonymous);
     const publicPage = await anonymous.newPage();
     const publicURL = `${baseURL}/#/public/${token}/releases`;
@@ -357,51 +343,46 @@ test("draft changes persist, public catalogs include drafts safely, and editing 
     const catalog = await (await publicResponse).json();
     expect(catalog.releases).toHaveLength(1);
     expect(catalog.releases[0].status).toBe("draft");
-    expect(catalog.releases[0].changes).toEqual([{ category: "improvement", title: "Improved calendar", description: "New calendar details" }]);
-    expect(Object.keys(catalog.releases[0]).sort()).toEqual(["application_id", "changes", "created_at", "id", "public_notes", "release_type", "status", "title", "version"]);
+    expect(catalog.releases[0].features).toEqual([{ name:"Major roadmap" }, { name:"New calendar" }]);
+    expect(Object.keys(catalog.releases[0]).sort()).toEqual(["application_id", "created_at", "features", "id", "public_notes", "release_type", "status", "title", "version"]);
     expect(JSON.stringify(catalog)).not.toContain("SECRET");
-    await expect(publicPage.getByText("Improved calendar", { exact: true })).toBeVisible();
+    for (const feature of features!) expect(JSON.stringify(catalog)).not.toContain(feature.id);
+    await expect(publicPage.getByText("New calendar", { exact: true })).toBeVisible();
+    await expect(publicPage.getByText("Major roadmap", { exact:true })).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await page.reload();
     await page
       .getByRole("button", { name: /1\.1\.0\s*Updated launch/ })
       .click();
-    await expect(
-      page.getByText("SECRET internal migration", { exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByText("Temporary change", { exact: true }),
-    ).toHaveCount(0);
+    await page.getByRole("tab", { name:"Changes",exact:true }).click();
+    await expect(page.getByRole("button", { name:"Unlink New calendar",exact:true })).toBeVisible();
+    await expect(page.getByRole("button", { name:"Unlink Temporary feature",exact:true })).toHaveCount(0);
+    await page.getByRole("tab", { name:"Details",exact:true }).click();
     for (const status of ["qa", "released"]) {
       await page.getByLabel("Release status", { exact: true }).selectOption(status);
-      await expect(page.getByLabel("Release status", { exact: true })).toBeEnabled();
-      await expect(
-        page.getByRole("button", { name: "Edit draft", exact: true }),
-      ).toHaveCount(0);
-      await expect(
-        page.getByRole("button", { name: "Add change", exact: true }),
-      ).toHaveCount(0);
-      await expect(
-        page.getByRole("button", {
-          name: "Delete change Improved calendar",
-          exact: true,
-        }),
-      ).toHaveCount(0);
       await page.getByLabel("Public release notes", { exact: true }).fill(`Notes in ${status}`);
       await page.getByRole("button", { name: "Save", exact: true }).click();
       await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+      await expect(page.getByLabel("Version", { exact:true })).toBeDisabled();
+      await page.getByRole("tab", { name:"Changes",exact:true }).click();
+      await expect(page.getByText("New calendar", { exact:true })).toBeVisible();
+      await expect(page.getByLabel("Planner feature")).toHaveCount(0);
+      await expect(page.getByRole("button", { name:"Unlink New calendar",exact:true })).toHaveCount(0);
+      await page.getByRole("tab", { name:"Details",exact:true }).click();
       await publicPage.reload();
       await expect(publicPage.getByText(`Notes in ${status}`, { exact: true })).toBeVisible();
       await expect(publicPage.getByText(status === "qa" ? "QA" : "Released", { exact: true })).toBeVisible();
     }
     await page.getByLabel("Release status", { exact: true }).selectOption("draft");
-    await expect(page.getByRole("button", { name: "Edit draft", exact: true })).toBeVisible();
+    await page.getByRole("button", { name:"Save",exact:true }).click();
+    await expect(page.getByLabel("Version", { exact:true })).toBeEnabled();
     await page.getByRole("button", { name: "Close", exact: true }).click();
     const content = await api<Record<string, unknown>[]>(owner, `shiplog_releases?id=eq.${release!.id}`);
     expect(content?.[0]).not.toHaveProperty("published_at");
     expect(content?.[0]).not.toHaveProperty("first_deployed_at");
   } finally {
     for (const context of contexts) await context.close();
+    if (otherWorkspace) await removeWorkspace(owner, otherWorkspace.id);
     await removeWorkspace(owner, workspace.id);
   }
 });

@@ -102,7 +102,7 @@ test("editable applications, existing teams, QA checks, individual approvals and
     await page
       .getByRole("button", { name: /1\.0\.0\s*Initial release/ })
       .click();
-    await page.getByRole("button", { name: "QA", exact: true }).click();
+    await page.getByRole("tab", { name: "QA", exact: true }).click();
     const check = page.getByRole("checkbox", {
       name: "Code review",
       exact: true,
@@ -111,9 +111,10 @@ test("editable applications, existing teams, QA checks, individual approvals and
     await expect(
       page.getByText("1 of 1 checks passed", { exact: true }),
     ).toBeVisible();
-    await expect(page.getByLabel("Release status", { exact: true })).toHaveCount(0);
-    await page.getByRole("button", { name: "Release details", exact: true }).click();
+    await expect(page.getByLabel("Release status", { exact: true })).toBeHidden();
+    await page.getByRole("tab", { name: "Details", exact: true }).click();
     await page.getByLabel("Release status", { exact: true }).selectOption("qa");
+    await page.getByRole("button", { name: "Save", exact:true }).click();
     await expect(
       page.getByLabel("Release status", { exact: true }),
     ).toBeEnabled();
@@ -124,6 +125,7 @@ test("editable applications, existing teams, QA checks, individual approvals and
     await page
       .getByLabel("Release status", { exact: true })
       .selectOption("released");
+    await page.getByRole("button", { name:"Save",exact:true }).click();
     await expect(
       page.getByLabel("Release status", { exact: true }),
     ).toBeEnabled();
@@ -145,7 +147,7 @@ test("editable applications, existing teams, QA checks, individual approvals and
     await page
       .getByRole("button", { name: /1\.0\.0\s*Initial release/ })
       .click();
-    await page.getByRole("button", { name: "QA", exact: true }).click();
+    await page.getByRole("tab", { name: "QA", exact: true }).click();
     await expect(check).toBeChecked();
     await page.getByRole("button", { name: "Close", exact: true }).click();
     for (const [decision, label] of [["approved", "Approved"], ["disapproved", "Disapproved"], ["approved", "Approved"]] as const) {
