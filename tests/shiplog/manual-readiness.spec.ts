@@ -58,9 +58,7 @@ test("editable applications, existing teams, QA checks, individual approvals and
       page.getByLabel("Team (optional)", { exact: true }),
     ).toHaveValue(team!.id);
     await page.getByRole("button", { name: "Close", exact: true }).click();
-    await page
-      .getByRole("checkbox", { name: "Include in public catalog", exact: true })
-      .check();
+    await expect(page.getByRole("checkbox", { name: "Include in public catalog", exact: true })).toHaveCount(0);
     await page
       .getByRole("button", { name: "Checklist template", exact: true })
       .click();

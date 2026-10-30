@@ -36,20 +36,14 @@ test("one workspace release catalog contains multiple apps, filters and never ex
       await expect(
         page.getByRole("heading", { name, exact: true }),
       ).toBeVisible();
-      await page
-        .getByRole("article")
-        .filter({ has: page.getByRole("heading", { name, exact: true }) })
-        .getByRole("checkbox", {
-          name: "Include in public catalog",
-          exact: true,
-        })
-        .check();
+      await expect(page.getByRole("checkbox", { name: "Include in public catalog", exact: true })).toHaveCount(0);
     }
     await page.getByRole("link", { name: "Releases", exact: true }).click();
     const applications = await api<{ id: string; name: string }[]>(
       owner,
       `shiplog_applications?workspace_id=eq.${workspace.id}`,
     );
+    for (const app of applications ?? []) expect(app).not.toHaveProperty("public_enabled");
     for (const name of ["Website", "Booking API"]) {
       await page
         .getByRole("button", { name: "New release", exact: true })
@@ -200,10 +194,6 @@ test("draft changes persist, public catalogs include drafts safely, and editing 
       },
     );
     expect(application?.id).toBeTruthy();
-    await api(owner, "rpc/shiplog_set_application_public", {
-      method: "POST",
-      body: JSON.stringify({ application: application!.id, enabled: true }),
-    });
     const release = await api<{ id: string }>(
       owner,
       "rpc/shiplog_create_release",
