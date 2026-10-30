@@ -22,33 +22,28 @@ test("one workspace release catalog contains multiple apps, filters and never ex
     contexts.push(context);
     await selectWorkspace(page, workspace.name);
     await page.getByRole("link", { name: "Applications", exact: true }).click();
-    for (const [name, slug] of [
-      ["Website", "website"],
-      ["Booking API", "booking-api"],
-    ]) {
+    for (const name of ["Website", "Booking API"]) {
       await page
         .getByRole("button", { name: "New application", exact: true })
         .click();
       await page.getByLabel("Name", { exact: true }).fill(name);
-      await page.getByLabel("Identifier", { exact: true }).fill(slug);
-      await page.getByRole("button", { name: "Create", exact: true }).click();
+      const save = page.getByRole("button", { name: "Save", exact: true });
+      await expect(save).toHaveAttribute("form", "application-form");
+      await expect(save).toHaveCSS("background-color", "oklch(0.205 0 0)");
+      await expect(page.locator("#application-form button[type=submit]")).toHaveCount(0);
+      await expect(save.locator("..").getByRole("button", { name: "Close", exact: true })).toBeVisible();
+      await save.click();
       await expect(
         page.getByRole("heading", { name, exact: true }),
       ).toBeVisible();
-      await page
-        .getByRole("article")
-        .filter({ has: page.getByRole("heading", { name, exact: true }) })
-        .getByRole("checkbox", {
-          name: "Include in public catalog",
-          exact: true,
-        })
-        .check();
+      await expect(page.getByRole("checkbox", { name: "Include in public catalog", exact: true })).toHaveCount(0);
     }
     await page.getByRole("link", { name: "Releases", exact: true }).click();
     const applications = await api<{ id: string; name: string }[]>(
       owner,
       `shiplog_applications?workspace_id=eq.${workspace.id}`,
     );
+    for (const app of applications ?? []) expect(app).not.toHaveProperty("public_enabled");
     for (const name of ["Website", "Booking API"]) {
       await page
         .getByRole("button", { name: "New release", exact: true })
@@ -59,37 +54,44 @@ test("one workspace release catalog contains multiple apps, filters and never ex
       await page.getByLabel("Version", { exact: true }).fill("1.0.0");
       await page.getByLabel("Title", { exact: true }).fill(`${name} launches`);
       await page
-        .getByLabel("Internal notes", { exact: true })
-        .fill("SECRET: private QA report");
-      await page
         .getByLabel("Public release notes", { exact: true })
         .fill(`${name} is now available.`);
-      await page.getByRole("button", { name: "Create", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Save", exact: true })).toHaveAttribute("form", "release-create-form");
+      await expect(page.locator("#release-create-form button[type=submit]")).toHaveCount(0);
+      await page.getByRole("button", { name: "Save", exact: true }).click();
       const release = page
         .getByRole("article")
         .filter({ hasText: `${name} launches` });
       await expect(release).toBeVisible();
-      await release
-        .getByRole("button", { name: "Publish notes", exact: true })
-        .click();
-      await page
-        .getByRole("alertdialog")
-        .getByRole("button", { name: "Publish notes", exact: true })
-        .click();
-      await expect(
-        release.getByText("Published", { exact: true }),
-      ).toBeVisible();
+      await expect(release.getByRole("button").locator("span").filter({ hasText: new RegExp(`^${name}$`) })).toHaveClass(/rounded-md/);
+      await expect(release.getByText("Draft", { exact: true })).toBeVisible();
+      await expect(release.getByRole("combobox", { name: "Your approval" })).toBeVisible();
+      await expect(release.getByRole("button", { name: /publish/i })).toHaveCount(0);
     }
+    await expect(
+      page.getByRole("link", { name: "Public portal", exact: true }),
+    ).toHaveCount(0);
+    await page.getByTestId("workspace-share").click();
+    const sharing = page.getByTestId("share-workspace-dialog");
+    await expect(
+      sharing.getByRole("region", { name: "People with access" }),
+    ).toBeVisible();
+    await expect(
+      sharing.getByRole("region", { name: "Public link" }),
+    ).toBeVisible();
     await page
-      .getByRole("link", { name: "Public portal", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Enable public catalog", exact: true })
+      .getByRole("button", { name: "Enable public link", exact: true })
       .click();
     const link = await page
-      .getByRole("textbox", { name: "Public releases link", exact: true })
+      .getByRole("textbox", { name: "Public link", exact: true })
       .inputValue();
-    const anonymous = await browser.newContext();
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await sharing.getByRole("button", { name: "Copy link", exact: true }).click();
+    await expect(sharing.getByRole("status")).toHaveText("Link copied");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(link);
+    const anonymous = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     contexts.push(anonymous);
     const publicPage = await anonymous.newPage();
     const loaded = publicPage.waitForResponse(
@@ -136,14 +138,14 @@ test("one workspace release catalog contains multiple apps, filters and never ex
       fullPage: true,
     });
     await page
-      .getByRole("button", { name: "Revoke public catalog", exact: true })
+      .getByRole("button", { name: "Revoke public link", exact: true })
       .click();
     await page
-      .getByRole("alertdialog")
-      .getByRole("button", { name: "Revoke public catalog", exact: true })
+      .getByTestId("confirm-dialog")
+      .getByRole("button", { name: "Revoke public link", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Enable public catalog", exact: true }),
+      page.getByRole("button", { name: "Enable public link", exact: true }),
     ).toBeVisible();
     await publicPage.reload();
     await expect(publicPage.getByRole("alert")).toContainText("unavailable");
@@ -175,7 +177,22 @@ test("Shiplog reuses workspace sharing and account sign-out controls", async ({
       "viewer",
     );
     await expect(dialog).toContainText("Not shared with anyone yet.");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(async () => (await dialog.boundingBox())!.width)
+      .toBeCloseTo(358, 0);
+    const bounds = (await dialog.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(15);
+    expect(bounds.height).toBeLessThanOrEqual(844 * 0.7 + 1);
+    await dialog.getByRole("button", { name: "Enable public link", exact: true })
+      .scrollIntoViewIfNeeded();
+    await expect(dialog.getByRole("button", { name: "Close", exact: true }))
+      .toBeInViewport();
+    await page.screenshot({ path: test.info().outputPath("mobile-sharing.png") });
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`${baseURL}/#/portal`);
+    await expect(page).toHaveURL(`${baseURL}/#/`);
+    await expect(page.getByTestId("workspace-share")).toBeVisible();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Sign in", exact: true }),
@@ -186,7 +203,7 @@ test("Shiplog reuses workspace sharing and account sign-out controls", async ({
   }
 });
 
-test("draft changes preview safely, persist edits and lock after publication and unpublication", async ({
+test("draft changes persist, public catalogs include drafts safely, and editing follows manual release status", async ({
   browser,
 }) => {
   test.setTimeout(150_000);
@@ -196,22 +213,16 @@ test("draft changes preview safely, persist edits and lock after publication and
   try {
     const application = await api<{ id: string }>(
       owner,
-      "rpc/shiplog_create_application",
+      "rpc/shiplog_save_application",
       {
         method: "POST",
         body: JSON.stringify({
           workspace: workspace.id,
           application_name: "Website",
-          application_slug: "website",
-          application_platform: "web",
         }),
       },
     );
     expect(application?.id).toBeTruthy();
-    await api(owner, "rpc/shiplog_set_application_public", {
-      method: "POST",
-      body: JSON.stringify({ application: application!.id, enabled: true }),
-    });
     const release = await api<{ id: string }>(
       owner,
       "rpc/shiplog_create_release",
@@ -221,9 +232,7 @@ test("draft changes preview safely, persist edits and lock after publication and
           input: {
             application_id: application!.id,
             version: "1.0.0",
-            release_type: "minor",
             title: "Draft launch",
-            internal_notes: "SECRET private notes",
             public_notes: "Original public notes",
           },
         }),
@@ -299,43 +308,16 @@ test("draft changes preview safely, persist edits and lock after publication and
     await expect(
       page.getByText("Temporary change", { exact: true }),
     ).toHaveCount(0);
-    const previewResponse = page.waitForResponse((response) =>
-      response.url().includes("/rpc/shiplog_preview_release"),
-    );
-    await page
-      .getByRole("button", { name: "Public preview", exact: true })
-      .click();
-    const preview = await (await previewResponse).json();
-    expect(preview.changes).toEqual([
-      {
-        category: "improvement",
-        title: "Improved calendar",
-        description: "New calendar details",
-      },
-    ]);
-    expect(Object.keys(preview).sort()).toEqual([
-      "application_id",
-      "changes",
-      "id",
-      "public_notes",
-      "published_at",
-      "release_type",
-      "title",
-      "version",
-    ]);
-    expect(JSON.stringify(preview)).not.toContain("SECRET");
-    await expect(
-      page.getByText("Improved calendar", { exact: true }),
-    ).toBeVisible();
-    await expect(page.getByText("SECRET", { exact: false })).toHaveCount(0);
+    for (const name of ["Public preview", "Approvals", "Deployments"]) await expect(page.getByRole("button", { name, exact: true })).toHaveCount(0);
     await page.screenshot({
-      path: test.info().outputPath("draft-preview.png"),
+      path: test.info().outputPath("release-details.png"),
       fullPage: true,
     });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(
       page.getByRole("button", { name: "Close", exact: true }),
     ).toBeInViewport();
+    await expect(page.getByRole("button", { name: "Save", exact: true })).toBeInViewport();
     await expect(
       page.getByRole("heading", {
         name: "1.1.0 — Updated launch",
@@ -343,7 +325,7 @@ test("draft changes preview safely, persist edits and lock after publication and
       }),
     ).toBeInViewport();
     await page.screenshot({
-      path: test.info().outputPath("draft-preview-mobile.png"),
+      path: test.info().outputPath("release-details-mobile.png"),
       fullPage: true,
     });
     await page.setViewportSize({ width: 1280, height: 720 });
@@ -351,10 +333,15 @@ test("draft changes preview safely, persist edits and lock after publication and
     contexts.push(anonymous);
     const publicPage = await anonymous.newPage();
     const publicURL = `${baseURL}/#/public/${token}/releases`;
+    const publicResponse = publicPage.waitForResponse((response) => response.url().includes("/rpc/shiplog_public_catalog"));
     await publicPage.goto(publicURL);
-    await expect(publicPage.getByRole("status")).toHaveText(
-      "No published releases to show.",
-    );
+    const catalog = await (await publicResponse).json();
+    expect(catalog.releases).toHaveLength(1);
+    expect(catalog.releases[0].status).toBe("draft");
+    expect(catalog.releases[0].changes).toEqual([{ category: "improvement", title: "Improved calendar", description: "New calendar details" }]);
+    expect(Object.keys(catalog.releases[0]).sort()).toEqual(["application_id", "changes", "created_at", "id", "public_notes", "release_type", "status", "title", "version"]);
+    expect(JSON.stringify(catalog)).not.toContain("SECRET");
+    await expect(publicPage.getByText("Improved calendar", { exact: true })).toBeVisible();
     await page.getByRole("button", { name: "Close", exact: true }).click();
     await page.reload();
     await page
@@ -366,44 +353,9 @@ test("draft changes preview safely, persist edits and lock after publication and
     await expect(
       page.getByText("Temporary change", { exact: true }),
     ).toHaveCount(0);
-    await page.getByRole("button", { name: "Close", exact: true }).click();
-    await page
-      .getByRole("button", { name: "Publish notes", exact: true })
-      .click();
-    await page
-      .getByRole("alertdialog")
-      .getByRole("button", { name: "Publish notes", exact: true })
-      .click();
-    await expect(page.getByText("Published", { exact: true })).toBeVisible();
-    const publicResponse = publicPage.waitForResponse((response) =>
-      response.url().includes("/rpc/shiplog_public_catalog"),
-    );
-    await publicPage.reload();
-    const catalog = await (await publicResponse).json();
-    expect({ ...catalog.releases[0], published_at: null }).toEqual(preview);
-    await expect(
-      publicPage.getByText("Improved calendar", { exact: true }),
-    ).toBeVisible();
-    await expect(publicPage.getByText("SECRET", { exact: false })).toHaveCount(
-      0,
-    );
-    for (const published of [true, false]) {
-      if (!published) {
-        await page
-          .getByRole("button", { name: "Unpublish notes", exact: true })
-          .click();
-        await page
-          .getByRole("alertdialog")
-          .getByRole("button", { name: "Unpublish notes", exact: true })
-          .click();
-        await expect(
-          page.getByRole("button", { name: "Publish notes", exact: true }),
-        ).toBeVisible();
-      }
-      await page
-        .getByRole("button", { name: /1\.1\.0\s*Updated launch/ })
-        .click();
-      await expect(page.getByText(/Release history is locked/)).toBeVisible();
+    for (const status of ["qa", "released"]) {
+      await page.getByLabel("Release status", { exact: true }).selectOption(status);
+      await expect(page.getByLabel("Release status", { exact: true })).toBeEnabled();
       await expect(
         page.getByRole("button", { name: "Edit draft", exact: true }),
       ).toHaveCount(0);
@@ -416,15 +368,19 @@ test("draft changes preview safely, persist edits and lock after publication and
           exact: true,
         }),
       ).toHaveCount(0);
-      await page.getByRole("button", { name: "Close", exact: true }).click();
+      await page.getByLabel("Public release notes", { exact: true }).fill(`Notes in ${status}`);
+      await page.getByRole("button", { name: "Save", exact: true }).click();
+      await expect(page.getByRole("button", { name: "Save", exact: true })).toBeEnabled();
+      await publicPage.reload();
+      await expect(publicPage.getByText(`Notes in ${status}`, { exact: true })).toBeVisible();
+      await expect(publicPage.getByText(status === "qa" ? "QA" : "Released", { exact: true })).toBeVisible();
     }
-    const content = await api<{ first_published_at: string }[]>(
-      owner,
-      `shiplog_releases?id=eq.${release!.id}&select=first_published_at`,
-    );
-    expect(content?.[0]?.first_published_at).toBeTruthy();
-    await publicPage.reload();
-    await expect(publicPage.getByRole("article")).toHaveCount(0);
+    await page.getByLabel("Release status", { exact: true }).selectOption("draft");
+    await expect(page.getByRole("button", { name: "Edit draft", exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Close", exact: true }).click();
+    const content = await api<Record<string, unknown>[]>(owner, `shiplog_releases?id=eq.${release!.id}`);
+    expect(content?.[0]).not.toHaveProperty("published_at");
+    expect(content?.[0]).not.toHaveProperty("first_deployed_at");
   } finally {
     for (const context of contexts) await context.close();
     await removeWorkspace(owner, workspace.id);

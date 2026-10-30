@@ -37,17 +37,41 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
     await opened.page
       .getByRole("link", { name: "Roadmap", exact: true })
       .click();
+    await expect(
+      opened.page.getByRole("button", { name: "Share roadmap", exact: true }),
+    ).toHaveCount(0);
+    await opened.page.getByTestId("workspace-share").click();
+    const sharing = opened.page.getByTestId("share-workspace-dialog");
+    const people = sharing.getByRole("region", { name: "People with access" });
+    const publicLink = sharing.getByRole("region", { name: "Public link" });
+    await expect(people).toBeVisible();
+    await expect(publicLink).toBeVisible();
+    expect(await people.evaluate((element) =>
+      element.compareDocumentPosition(
+        element.parentElement!.querySelector('section[aria-label="Public link"]')!,
+      ) & Node.DOCUMENT_POSITION_FOLLOWING,
+    )).toBeTruthy();
+    await expect.poll(async () => (await sharing.boundingBox())!.width)
+      .toBeCloseTo(968, 0);
+    const bounds = await sharing.boundingBox();
+    expect(bounds!.height).toBeLessThanOrEqual(
+      opened.page.viewportSize()!.height * 0.7 + 1,
+    );
     await opened.page
-      .getByRole("button", { name: "Share roadmap", exact: true })
-      .click();
-    await opened.page
-      .getByRole("button", { name: "Create share link", exact: true })
+      .getByRole("button", { name: "Enable public link", exact: true })
       .click();
     const link = await opened.page
-      .getByRole("textbox", { name: "Public roadmap link" })
+      .getByRole("textbox", { name: "Public link", exact: true })
       .inputValue();
+    await opened.context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await sharing.getByRole("button", { name: "Copy link", exact: true }).click();
+    await expect(sharing.getByRole("status")).toHaveText("Link copied");
+    expect(await opened.page.evaluate(() => navigator.clipboard.readText()))
+      .toBe(link);
 
-    const anonymous = await browser.newContext();
+    const anonymous = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     contexts.push(anonymous);
     const page = await anonymous.newPage();
     const loaded = page.waitForResponse(
@@ -120,15 +144,15 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
     ).toBeVisible();
 
     await opened.page
-      .getByRole("button", { name: "Revoke link", exact: true })
+      .getByRole("button", { name: "Revoke public link", exact: true })
       .click();
     await opened.page
-      .getByRole("alertdialog")
-      .getByRole("button", { name: "Revoke link", exact: true })
+      .getByTestId("confirm-dialog")
+      .getByRole("button", { name: "Revoke public link", exact: true })
       .click();
     await expect(
       opened.page.getByRole("button", {
-        name: "Create share link",
+        name: "Enable public link",
         exact: true,
       }),
     ).toBeVisible();
