@@ -68,16 +68,30 @@ test("one workspace release catalog contains multiple apps, filters and never ex
       await expect(release.getByRole("combobox", { name: "Your approval" })).toBeVisible();
       await expect(release.getByRole("button", { name: /publish/i })).toHaveCount(0);
     }
+    await expect(
+      page.getByRole("link", { name: "Public portal", exact: true }),
+    ).toHaveCount(0);
+    await page.getByTestId("workspace-share").click();
+    const sharing = page.getByTestId("share-workspace-dialog");
+    await expect(
+      sharing.getByRole("region", { name: "People with access" }),
+    ).toBeVisible();
+    await expect(
+      sharing.getByRole("region", { name: "Public link" }),
+    ).toBeVisible();
     await page
-      .getByRole("link", { name: "Public portal", exact: true })
-      .click();
-    await page
-      .getByRole("button", { name: "Enable public catalog", exact: true })
+      .getByRole("button", { name: "Enable public link", exact: true })
       .click();
     const link = await page
-      .getByRole("textbox", { name: "Public releases link", exact: true })
+      .getByRole("textbox", { name: "Public link", exact: true })
       .inputValue();
-    const anonymous = await browser.newContext();
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await sharing.getByRole("button", { name: "Copy link", exact: true }).click();
+    await expect(sharing.getByRole("status")).toHaveText("Link copied");
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(link);
+    const anonymous = await browser.newContext({
+      storageState: { cookies: [], origins: [] },
+    });
     contexts.push(anonymous);
     const publicPage = await anonymous.newPage();
     const loaded = publicPage.waitForResponse(
@@ -124,14 +138,14 @@ test("one workspace release catalog contains multiple apps, filters and never ex
       fullPage: true,
     });
     await page
-      .getByRole("button", { name: "Revoke public catalog", exact: true })
+      .getByRole("button", { name: "Revoke public link", exact: true })
       .click();
     await page
-      .getByRole("alertdialog")
-      .getByRole("button", { name: "Revoke public catalog", exact: true })
+      .getByTestId("confirm-dialog")
+      .getByRole("button", { name: "Revoke public link", exact: true })
       .click();
     await expect(
-      page.getByRole("button", { name: "Enable public catalog", exact: true }),
+      page.getByRole("button", { name: "Enable public link", exact: true }),
     ).toBeVisible();
     await publicPage.reload();
     await expect(publicPage.getByRole("alert")).toContainText("unavailable");
@@ -163,7 +177,22 @@ test("Shiplog reuses workspace sharing and account sign-out controls", async ({
       "viewer",
     );
     await expect(dialog).toContainText("Not shared with anyone yet.");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(async () => (await dialog.boundingBox())!.width)
+      .toBeCloseTo(358, 0);
+    const bounds = (await dialog.boundingBox())!;
+    expect(bounds.x).toBeGreaterThanOrEqual(15);
+    expect(bounds.height).toBeLessThanOrEqual(844 * 0.7 + 1);
+    await dialog.getByRole("button", { name: "Enable public link", exact: true })
+      .scrollIntoViewIfNeeded();
+    await expect(dialog.getByRole("button", { name: "Close", exact: true }))
+      .toBeInViewport();
+    await page.screenshot({ path: test.info().outputPath("mobile-sharing.png") });
     await dialog.getByRole("button", { name: "Close", exact: true }).click();
+    await page.setViewportSize({ width: 1280, height: 720 });
+    await page.goto(`${baseURL}/#/portal`);
+    await expect(page).toHaveURL(`${baseURL}/#/`);
+    await expect(page.getByTestId("workspace-share")).toBeVisible();
     await page.getByRole("button", { name: "Sign out", exact: true }).click();
     await expect(
       page.getByRole("button", { name: "Sign in", exact: true }),
