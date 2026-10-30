@@ -31,7 +31,7 @@ export async function api<T>(account: Account, path: string, init: RequestInit =
   const body = await response.text();
   return body ? JSON.parse(body) : undefined;
 }
-export async function authenticatedPage(browser: Browser, account: Account): Promise<{ page: Page; context: BrowserContext }> {
+export async function authenticatedPage(browser: Browser, account: Account, baseURL = "http://127.0.0.1:5176"): Promise<{ page: Page; context: BrowserContext }> {
   const context = await browser.newContext();
   await context.addInitScript(({ storageKey, session }) => {
     localStorage.setItem(storageKey, JSON.stringify(session));
@@ -41,7 +41,7 @@ export async function authenticatedPage(browser: Browser, account: Account): Pro
     storageKey: `sb-${new URL(url!).hostname.split(".")[0]}-auth-token`, session: account,
   });
   const page = await context.newPage();
-  await page.goto("http://127.0.0.1:5176/#/");
+  await page.goto(`${baseURL}/#/`);
   return { page, context };
 }
 

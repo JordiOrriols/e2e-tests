@@ -81,6 +81,17 @@ export default defineConfig({
   /* Configure projects for each app and environment */
   projects: [
     {
+      name: "shiplog-localhost",
+      testDir: "./tests/shiplog",
+      timeout: 60_000,
+      expect: { timeout: 10_000 },
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: "http://127.0.0.1:5178",
+      },
+      metadata: { project: "shiplog", environment: "localhost" },
+    },
+    {
       name: "planner-localhost",
       testDir: "./tests/planner",
       /*
