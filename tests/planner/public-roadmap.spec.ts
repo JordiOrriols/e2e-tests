@@ -45,12 +45,12 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
     const people = sharing.getByRole("region", { name: "People with access" });
     const publicLink = sharing.getByRole("region", { name: "Public link" });
     await expect(people).toBeVisible();
+    await expect(sharing.getByRole("tab", { name: "Emails", exact: true }))
+      .toHaveAttribute("aria-selected", "true");
+    await expect(publicLink).toHaveCount(0);
+    await sharing.getByRole("tab", { name: "Link", exact: true }).click();
     await expect(publicLink).toBeVisible();
-    expect(await people.evaluate((element) =>
-      element.compareDocumentPosition(
-        element.parentElement!.querySelector('section[aria-label="Public link"]')!,
-      ) & Node.DOCUMENT_POSITION_FOLLOWING,
-    )).toBeTruthy();
+    await expect(people).toHaveCount(0);
     await expect.poll(async () => (await sharing.boundingBox())!.width)
       .toBeCloseTo(968, 0);
     const bounds = await sharing.boundingBox();
