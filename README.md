@@ -32,6 +32,11 @@ The suite verifies shared field labels, hint/error associations, native form
 validation, submitted values, reset, disabled controls and desktop/mobile sizing.
 The existing global auth setup still requires the standard test-account environment.
 
+Shared error boundaries/states are covered by
+`npx playwright test error-states.spec.ts --project=ui-localhost` against the
+same built UI Storybook. The suite verifies diagnostics, explicit keyboard
+recovery, disabled retry and desktop/mobile fallback readability.
+
 ### All Tests
 ```bash
 npm test
