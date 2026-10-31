@@ -1,5 +1,17 @@
 # E2E Tests
 
+## Shared app-shell composition
+
+`tests/ui/app-shell.spec.ts` validates the built UI AppShell Storybook examples.
+It covers desktop/mobile navigation, keyboard language selection, localized
+contribution links, caller-owned account actions, short-page footer placement,
+long-page document scrolling, and full-width main overrides.
+Start the UI built Storybook preview on port 6008, then run:
+
+```sh
+npx playwright test tests/ui/app-shell.spec.ts --project=ui-localhost --workers=1
+```
+
 End-to-end testing repository for jordiorriols projects using Playwright.
 
 ## Projects Tested
