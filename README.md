@@ -10,6 +10,7 @@ End-to-end testing repository for jordiorriols projects using Playwright.
 | Airmap | https://airmap.jordiorriols.cat | http://localhost:5174 |
 | Ladders | https://ladders.jordiorriols.cat | http://localhost:5175 |
 | Planner | Not configured | http://127.0.0.1:5176 |
+| UI Storybook | Not configured | http://127.0.0.1:6008 |
 
 ## Setup
 
@@ -22,6 +23,14 @@ npx playwright install
 ```
 
 ## Running Tests
+
+### Shared UI forms
+
+Serve the UI repository's built Storybook on port 6008 (or set `UI_LOCAL_URL`),
+then run `npx playwright test form-fields.spec.ts --project=ui-localhost`.
+The suite verifies shared field labels, hint/error associations, native form
+validation, submitted values, reset, disabled controls and desktop/mobile sizing.
+The existing global auth setup still requires the standard test-account environment.
 
 ### All Tests
 ```bash
