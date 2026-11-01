@@ -1,5 +1,13 @@
 # E2E Tests
 
+## Consumer shell and checklist actions
+
+The Planner/Pulse `app-shell.spec.ts` tests measure real footer placement,
+document scrolling, navigation and full-width roadmap behavior using published
+UI components. Shiplog `checklist-icons.spec.ts` verifies top-right icon-only
+edit/delete actions, shared hover/focus tooltips and edit/delete persistence.
+All test-created workspaces are removed in cleanup.
+
 ## Shared app-shell composition
 
 `tests/ui/app-shell.spec.ts` validates the built UI AppShell Storybook examples.
