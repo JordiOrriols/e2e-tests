@@ -1,5 +1,6 @@
 import { test, expect, type BrowserContext, type Page } from "@playwright/test";
 import { randomUUID } from "node:crypto";
+import { expectPublicLayout } from "../shared/public-layout";
 import {
   PLANNER_URL, api, authenticatedPage, calendarDay, createRoster, createWorkspace, removeWorkspace, selectWorkspace, setAvailability,
   showMonth, signIn, vacationBadge, type Account,
@@ -96,6 +97,7 @@ test.describe("Planner vacation calendar", () => {
     const page = await anonymous.newPage();
     await page.goto(`${PLANNER_URL}/#/vacations/${roster.ownerMember.vacation_token}`);
     await expect(page.getByRole("heading", { name: "Owner", exact: true })).toBeVisible();
+    await expectPublicLayout(page);
     await expect(page.locator('input[type="date"]')).toHaveCount(0);
 
     const legend = page.getByLabel("Team vacation legend", { exact: true });
