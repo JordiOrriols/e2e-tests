@@ -99,11 +99,13 @@ export async function setPlanStart(page: Page, date: string) {
   // The editor closes once the plan start is saved; until then the schedule is read-only.
   await expect(input).toBeHidden();
 }
-/** The vacation calendar opens on the current month; page to the month of `date`. */
+/** Navigate from the displayed month, including after an earlier calendar edit. */
 export async function showMonth(page: Page, date: string) {
   const target = new Date(`${date}T00:00:00`);
-  const now = new Date();
-  const offset = (target.getFullYear() - now.getFullYear()) * 12 + target.getMonth() - now.getMonth();
+  const middleDay = await page.getByRole("button", { name: /^\d{4}-\d{2}-15( |$)/ }).getAttribute("aria-label");
+  if (!middleDay) throw new Error("The vacation calendar has no displayed month");
+  const displayed = new Date(`${middleDay.slice(0, 10)}T00:00:00`);
+  const offset = (target.getFullYear() - displayed.getFullYear()) * 12 + target.getMonth() - displayed.getMonth();
   const button = page.getByRole("button", { name: offset > 0 ? "Next month" : "Previous month", exact: true });
   for (let step = 0; step < Math.abs(offset); step++) await button.click();
 }

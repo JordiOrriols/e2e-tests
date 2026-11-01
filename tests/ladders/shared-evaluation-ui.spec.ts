@@ -11,6 +11,11 @@ test("shared self, peer and view pages reuse branding, language selection and fo
     await expect(shared.page.getByTestId("page-message")).toHaveCount(0);
     const header = shared.page.getByTestId("assessment-header");
     await expect(header).toBeVisible();
+    await expect(shared.page.getByRole("banner")).toHaveCount(1);
+    await expect(shared.page.getByRole("main")).toHaveCount(1);
+    await expect(shared.page.getByTestId("app-footer")).toHaveCount(1);
+    await expect(shared.page.getByTestId("sign-in-button")).toHaveCount(0);
+    await expect(shared.page.getByRole("button", { name: "Switch project", exact: true })).toHaveCount(0);
     await expect(header.locator("svg.lucide-trending-up")).toBeVisible();
     for (const [language, footer] of [
       ["Español", "Hecho con amor por Jordi Orriols"],
@@ -62,6 +67,12 @@ test("manager shares and hides each peer comment while the public API redacts pr
   const app = new LaddersApp(page);
   await app.gotoHome();
   await app.openTeamMember(member.name);
+  const goals = page.getByRole("banner").getByRole("link", { name: "SMART Goals", exact: true });
+  await goals.click();
+  await expect(page).toHaveURL(/tab=goals/);
+  await page.reload();
+  await expect(goals).toHaveAttribute("aria-current", "page");
+  await page.getByRole("banner").getByRole("link", { name: "Evaluation", exact: true }).click();
   const technology = page.getByTestId(`comment-visibility-${peer.id}-Technology`);
   const people = page.getByTestId(`comment-visibility-${peer.id}-People`);
   await expect(technology).toHaveText("Share with employee");

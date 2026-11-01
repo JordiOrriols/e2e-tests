@@ -23,7 +23,7 @@ export class LaddersHomePage extends BasePage {
   }
 
   get mainArea(): Locator {
-    return this.page.getByTestId("main-area");
+    return this.page.getByRole("main");
   }
 
   // Header locators using data-testid
@@ -57,9 +57,7 @@ export class LaddersHomePage extends BasePage {
   }
 
   get tabsList(): Locator {
-    return this.page.getByTestId("tabs-list").or(
-      this.page.locator('[role="tablist"]')
-    );
+    return this.page.getByTestId("tabs-list");
   }
 
   get teamTab(): Locator {
@@ -71,7 +69,7 @@ export class LaddersHomePage extends BasePage {
   }
 
   get tabButtons(): Locator {
-    return this.page.locator('[role="tab"]');
+    return this.tabsList.getByRole("link");
   }
 
   // Team content using data-testid
