@@ -1,5 +1,19 @@
 # E2E Tests
 
+## Shared account and public-link layouts
+
+`tests/ui/account-public-layout.spec.ts` checks shared account/login error
+localization and recovery, signup confirmation, password reset, OAuth failures,
+public-frame mobile language controls, restricted-write callbacks, one
+header/main/footer, and exact short/long footer geometry. Storybook callbacks
+are local examples; these tests never authenticate against a production account.
+
+With the UI built Storybook preview on port 6008:
+
+```sh
+npx playwright test tests/ui/account-public-layout.spec.ts --project=ui-localhost --workers=1
+```
+
 ## Shared app-shell composition
 
 `tests/ui/app-shell.spec.ts` validates the built UI AppShell Storybook examples.
