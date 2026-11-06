@@ -30,6 +30,13 @@ export const PROJECTS = [
     icon: "lucide-rocket",
     color: "rgb(245, 158, 11)",
   },
+  {
+    id: "agents",
+    name: "Agents",
+    url: "https://agents.jordiorriols.cat/",
+    icon: "lucide-bot",
+    color: "rgb(6, 182, 212)",
+  },
 ] as const;
 
 const iconClass = (svg: Element) =>
