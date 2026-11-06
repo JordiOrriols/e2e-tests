@@ -67,7 +67,7 @@ test("explicit creation works and deletion confirms, shows rejections, then refr
   const { page, context } = await authenticatedPage(browser, account, baseURL);
   let created: Workspace | undefined;
   const name = `Lifecycle E2E ${randomUUID().slice(0, 8)}`;
-  let rejected = true;
+  let featureId: string | undefined;
   try {
     await page.route("**/rest/v1/rpc/list_workspaces", (route) =>
       route.fulfill({ json: created ? [created] : [] }),
@@ -78,24 +78,15 @@ test("explicit creation works and deletion confirms, shows rejections, then refr
       created = { ...(await response.json()), access_level: "owner" };
       await route.fulfill({ response });
     });
-    // Hosted deployment requires approval; backend tests exercise the real migrated RPC.
-    // This browser contract drives its success/error responses without deploying it.
     await page.route("**/rest/v1/rpc/delete_workspace", async (route) => {
       const target = route.request().postDataJSON()?.workspace;
       if (!created || target !== created.id)
         throw new Error(
           "Deletion must target only this test's empty workspace",
         );
-      if (rejected) {
-        await route.fulfill({
-          status: 409,
-          json: { code: "23503", message: "Workspace is not empty" },
-        });
-      } else {
-        await removeWorkspace(account, created.id);
-        created = undefined;
-        await route.fulfill({ json: null });
-      }
+      const response = await route.fetch();
+      if (response.ok()) created = undefined;
+      await route.fulfill({ response });
     });
     await page.reload();
     const setup = page.getByTestId("workspace-setup");
@@ -105,6 +96,28 @@ test("explicit creation works and deletion confirms, shows rejections, then refr
     await page.getByTestId("team-name-submit").click();
     const switcher = page.getByTestId("workspace-switcher");
     await expect(switcher).toHaveAttribute("title", name);
+    if (!created) throw new Error("The workspace was not created");
+    const id = created.id;
+    await api(account, "rpc/create_team", {
+      method: "POST",
+      body: JSON.stringify({ p_name: "Empty E2E team", p_workspace: id }),
+    });
+    const projects = await api<{ id: string }[]>(account, "projects", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ workspace_id: id, name: "E2E project" }),
+    });
+    if (!projects?.[0]) throw new Error("The test project was not created");
+    const features = await api<{ id: string }[]>(account, "features", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        project_id: projects[0].id,
+        name: "Content prevents deletion",
+      }),
+    });
+    if (!features?.[0]) throw new Error("The test feature was not created");
+    featureId = features[0].id;
     await switcher.click();
     await page.getByRole("menuitem", { name: "Delete workspace" }).click();
     await expect(page.getByTestId("confirm-dialog")).toBeVisible();
@@ -117,14 +130,18 @@ test("explicit creation works and deletion confirms, shows rejections, then refr
       page.getByRole("alert").filter({ hasText: "Workspace is not empty" }),
     ).toBeVisible();
     await expect(switcher).toHaveAttribute("title", name);
-    rejected = false;
+    await api(account, `features?id=eq.${featureId}`, { method: "DELETE" });
+    featureId = undefined;
     await switcher.click();
     await page.getByRole("menuitem", { name: "Delete workspace" }).click();
     await page.getByTestId("confirm-dialog-confirm").click();
     await expect(setup).toBeVisible();
     expect(created).toBeUndefined();
+    expect(await api(account, `workspaces?id=eq.${id}&select=id`)).toEqual([]);
   } finally {
     await context.close();
+    if (featureId)
+      await api(account, `features?id=eq.${featureId}`, { method: "DELETE" });
     if (created) await removeWorkspace(account, created.id);
   }
 });
