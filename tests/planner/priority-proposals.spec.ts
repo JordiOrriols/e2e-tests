@@ -134,11 +134,13 @@ test("only the pending suffix moves; drag recalculates without official writes",
   await open(page);
   for (const name of ["Earlier pending", "Finished", "Active"])
     await expect(
-      page.getByRole("button", { name: `Move ${name} down` }),
+      page.getByRole("button", { name: `Reorder ${name}` }),
     ).toHaveCount(0);
-  await expect(
-    page.getByRole("button", { name: "Move Experiment A up" }),
-  ).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Move / })).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Reorder Experiment A" })
+    .press("ArrowUp");
+  expect(state.previews).toHaveLength(0);
   const before = await page
     .getByRole("img", { name: /^Experiment B:/ })
     .getAttribute("aria-label");
@@ -169,20 +171,22 @@ test("only the pending suffix moves; drag recalculates without official writes",
   expect(state.officialWrites()).toBe(0);
 });
 
-test("dependencies stop keyboard/button moves and anonymous saves require sign-in", async ({
+test("the drag handle retains keyboard access and dependencies block invalid moves", async ({
   page,
 }) => {
   const state = await service(page);
   await open(page);
-  const up = page.getByRole("button", { name: "Move Experiment C up" });
+  const up = page.getByRole("button", { name: "Reorder Experiment C" });
   await up.focus();
-  await page.keyboard.press("Enter");
+  await page.keyboard.press("ArrowUp");
   await expect(
     page.getByText(
       "Temporary experiment. The official priorities have not changed.",
     ),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Move Experiment C up" }).click();
+  await page
+    .getByRole("button", { name: "Reorder Experiment C" })
+    .press("ArrowUp");
   await expect(
     page.getByText(
       '"Experiment C" must come after its dependency "Experiment A".',
@@ -206,7 +210,9 @@ test("signed-in visitors save, recover after reload and compare multiple named s
   try {
     const state = await service(page);
     await open(page);
-    await page.getByRole("button", { name: "Move Experiment B up" }).click();
+    await page
+      .getByRole("button", { name: "Reorder Experiment B" })
+      .press("ArrowUp");
     await expect(
       page.getByText(
         "Temporary experiment. The official priorities have not changed.",
@@ -268,7 +274,9 @@ test("stale service revisions surface an error and retain the last visible plan"
   const before = await page
     .getByRole("img", { name: /^Experiment B:/ })
     .getAttribute("aria-label");
-  await page.getByRole("button", { name: "Move Experiment B up" }).click();
+  await page
+    .getByRole("button", { name: "Reorder Experiment B" })
+    .press("ArrowUp");
   await expect(
     page.getByText(/roadmap has changed or cannot be reordered/i),
   ).toBeVisible();

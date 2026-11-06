@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
-import { expect, test, type BrowserContext } from "@playwright/test";
+import {
+  expect,
+  test,
+  type BrowserContext,
+  type Locator,
+} from "@playwright/test";
 import {
   api,
   authenticatedPage,
@@ -7,6 +12,7 @@ import {
   createWorkspace,
   removeWorkspace,
   signIn,
+  selectWorkspace,
 } from "./planner-helpers";
 
 type PublicFeature = {
@@ -26,6 +32,21 @@ type PublicPlan = {
   markers: unknown[];
   features: PublicFeature[];
 };
+
+function measureTitle(title: Locator) {
+  return title.evaluate((node) => {
+    const cell = node.closest("[draggable]")!;
+    return {
+      display: getComputedStyle(node).display,
+      overflow: getComputedStyle(node).overflow,
+      ellipsis: getComputedStyle(node).textOverflow,
+      clipped: node.scrollWidth > node.clientWidth,
+      withinColumn:
+        node.getBoundingClientRect().right <=
+        cell.getBoundingClientRect().right + 1,
+    };
+  });
+}
 
 test("real service enforces dependencies and keeps named proposals separate from official priorities", async ({
   browser,
@@ -70,6 +91,7 @@ test("real service enforces dependencies and keeps named proposals separate from
       "Experiment B",
       "Experiment C",
     ];
+    names[0] = "A very long feature title ".repeat(4).trim();
     await api(owner, "features", {
       method: "POST",
       body: JSON.stringify(
@@ -156,7 +178,7 @@ test("real service enforces dependencies and keeps named proposals separate from
     ).toBeVisible();
     for (const name of names.slice(0, 3))
       await expect(
-        page.getByRole("button", { name: `Move ${name} down` }),
+        page.getByRole("button", { name: `Reorder ${name}` }),
       ).toHaveCount(0);
     const child = official.features.find((item) => item.id === ids[5])!;
     const prerequisite = official.features.find((item) => item.id === ids[3])!;
@@ -164,7 +186,10 @@ test("real service enforces dependencies and keeps named proposals separate from
     const previewResponse = page.waitForResponse((response) =>
       response.url().includes("/functions/v1/roadmap"),
     );
-    await page.getByRole("button", { name: "Move Experiment B up" }).click();
+    await expect(page.getByRole("button", { name: /^Move / })).toHaveCount(0);
+    await page
+      .getByRole("button", { name: "Reorder Experiment B" })
+      .dragTo(page.getByRole("button", { name: "Reorder Experiment A" }));
     const preview: PublicPlan = await (await previewResponse).json();
     const order = [ids[0], ids[1], ids[2], ids[4], ids[3], ids[5]];
     expect(preview.features.map((item) => item.id)).toEqual(order);
@@ -270,12 +295,95 @@ test("real service enforces dependencies and keeps named proposals separate from
     await publicPage
       .getByRole("button", { name: "Return to official plan" })
       .click();
+    const publicTitle = publicPage.getByTitle(names[0]!, { exact: true });
+    await expect(publicTitle).toBeVisible();
+    const publicWrap = publicPage.getByRole("button", { name: "Wrap titles" });
+    if ((await publicWrap.getAttribute("aria-pressed")) === "true")
+      await publicWrap.click();
+    for (const width of [1280, 390]) {
+      await publicPage.setViewportSize({ width, height: 900 });
+      expect(await measureTitle(publicTitle)).toEqual({
+        display: "block",
+        overflow: "hidden",
+        ellipsis: "ellipsis",
+        clipped: true,
+        withinColumn: true,
+      });
+      await publicWrap.click();
+      expect((await measureTitle(publicTitle)).withinColumn).toBe(true);
+      await publicWrap.click();
+    }
+    await publicPage.setViewportSize({ width: 1280, height: 900 });
     await publicPage.getByRole("button", { name: "Propose priority" }).click();
     await expect(
       publicPage
         .getByRole("alertdialog")
         .getByRole("heading", { name: "Sign in" }),
     ).toBeVisible();
+    await page.goto("/#/backlog");
+    await selectWorkspace(page, workspace.name);
+    const title = page.getByTitle(names[0]!, { exact: true });
+    const measure = () => measureTitle(title);
+    await expect(title).toBeVisible();
+    const wrap = page.getByRole("button", { name: "Wrap titles" });
+    if ((await wrap.getAttribute("aria-pressed")) === "true")
+      await wrap.click();
+    for (let width = 0; width < 2; width++) {
+      expect(await measure()).toEqual({
+        display: "block",
+        overflow: "hidden",
+        ellipsis: "ellipsis",
+        clipped: true,
+        withinColumn: true,
+      });
+      await wrap.click();
+      expect((await measure()).withinColumn).toBe(true);
+      await wrap.click();
+      await page.getByRole("button", { name: "Full width" }).click();
+    }
+    const marker = await api<{ id: string }[]>(owner, "roadmap_markers", {
+      method: "POST",
+      headers: { Prefer: "return=representation" },
+      body: JSON.stringify({
+        workspace_id: workspace.id,
+        name: "Rename E2E",
+        date: "2026-02-04",
+      }),
+    });
+    if (!marker?.[0]) throw new Error("Test marker creation failed");
+    await page.reload();
+    await page.getByRole("button", { name: "Manage markers" }).click();
+    const manager = page.getByRole("dialog");
+    await manager
+      .getByRole("button", { name: "Edit marker Rename E2E" })
+      .click();
+    await manager.getByLabel("Marker name").nth(1).fill("Renamed E2E");
+    await manager.getByRole("button", { name: "Save Changes" }).click();
+    await expect(
+      manager.getByRole("button", { name: "Edit marker Renamed E2E" }),
+    ).toBeVisible();
+    await manager.getByRole("button", { name: "Close", exact: true }).click();
+    await page.reload();
+    await page.getByRole("button", { name: "Manage markers" }).click();
+    await expect(
+      page.getByRole("button", { name: "Edit marker Renamed E2E" }),
+    ).toBeVisible();
+    expect(
+      await api(
+        owner,
+        `roadmap_markers?id=eq.${marker[0].id}&select=name,date`,
+      ),
+    ).toEqual([{ name: "Renamed E2E", date: "2026-02-04" }]);
+    const renamedPublicPlan = publicPage.waitForResponse((response) =>
+      response.url().includes("/functions/v1/roadmap"),
+    );
+    await publicPage.reload();
+    const publicAfterRename: PublicPlan = await (await renamedPublicPlan).json();
+    expect(publicAfterRename.markers).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: "Renamed E2E", date: "2026-02-04" }),
+      ]),
+    );
     expect(analyticsEvents).toBe(0);
   } finally {
     await context?.close();
@@ -285,6 +393,9 @@ test("real service enforces dependencies and keeps named proposals separate from
     });
     await api(owner, `features?id=in.(${ids.join(",")})`, { method: "DELETE" });
     await api(owner, `projects?workspace_id=eq.${workspace.id}`, {
+      method: "DELETE",
+    });
+    await api(owner, `roadmap_markers?workspace_id=eq.${workspace.id}`, {
       method: "DELETE",
     });
     await removeWorkspace(owner, workspace.id);
