@@ -3,7 +3,7 @@ import { localApps } from "./project-navigation.config";
 
 export default defineConfig({
   testDir: "./tests/planner",
-  testMatch: "priority-proposals.spec.ts",
+  testMatch: ["priority-proposals.spec.ts", "priority-proposals-live.spec.ts"],
   timeout: 60_000,
   expect: { timeout: 15_000 },
   workers: 1,
