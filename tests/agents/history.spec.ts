@@ -9,7 +9,7 @@ const user = {
   created_at: "2026-11-01T00:00:00Z",
 };
 
-const history = JSON.stringify({
+const runHistory = {
   kind: "agents-run",
   version: 1,
   model: "ollama/qwen3.6:35b",
@@ -28,10 +28,20 @@ const history = JSON.stringify({
     },
     { name: "review", seconds: 2, tokens: 90, tools: [] },
   ],
+};
+const history = JSON.stringify(runHistory);
+const completedHistory = JSON.stringify({
+  ...runHistory,
+  answer: "Respuesta completada para la tarea de prueba.",
+  verification: "La respuesta satisface el objetivo de prueba.",
+  failure: null,
 });
 
 async function mockTask(page: Page, initiallyRunning = false) {
-  const state = { running: initiallyRunning };
+  const state: { running: boolean; finishedStatus: "failed" | "completed" } = {
+    running: initiallyRunning,
+    finishedStatus: "failed",
+  };
   const expires = Math.floor(Date.now() / 1000) + 3600;
   const token =
     [
@@ -83,7 +93,7 @@ async function mockTask(page: Page, initiallyRunning = false) {
           workspace_id: "ws-1",
           title: "Atracciones abiertas",
           instructions: "Cuántas atracciones están abiertas hoy.",
-          status: state.running ? "running" : "failed",
+          status: state.running ? "running" : state.finishedStatus,
           plan: "",
           outcome: "",
           error: "",
@@ -109,7 +119,10 @@ async function mockTask(page: Page, initiallyRunning = false) {
               id: "run-1",
               task_id: "task-1",
               role: "agent",
-              body: history,
+              body:
+                state.finishedStatus === "completed"
+                  ? completedHistory
+                  : history,
               created_at: "2026-11-01T00:01:00Z",
             },
           ];
@@ -150,8 +163,9 @@ test("refreshes conversation when the runner finishes a task", async ({
   await page.goto("/#/tasks/task-1");
   await expect(page.getByRole("dialog")).toBeVisible();
   await expect(page.getByTestId("agent-run-history")).toHaveCount(0);
+  state.finishedStatus = "completed";
   state.running = false;
   await expect(page.getByTestId("agent-run-history")).toContainText(
-    "No he podido verificar",
+    "Respuesta completada",
   );
 });
