@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import { test, expect } from "@playwright/test";
 import {
   createLocalAccount,
+  localPermission,
   localSQL,
   removeLocalAccount,
 } from "./local-helpers";
@@ -41,8 +42,7 @@ test("Planner uses one-origin path routing, server scheduling and explicit exter
         })
       ).status(),
     ).toBe(403);
-    localSQL(`INSERT INTO platform.grants(user_id,app,workspace_id,role)
-      VALUES('${account.id}','planner','${source.id}','external')`);
+    localPermission("grant", account.id, "planner", source.id, "external");
     await page.reload();
     await page.getByRole("link", { name: source.name, exact: true }).click();
     await expect(page).toHaveURL(
@@ -110,7 +110,7 @@ test("Planner uses one-origin path routing, server scheduling and explicit exter
     await page.goto(`${origin}/shiplog/`);
     await expect(page.getByRole("status")).toContainText("do not have access");
     await page.goto(`${origin}/planner/workspaces/${source.id}/roadmap`);
-    localSQL(`DELETE FROM platform.grants WHERE user_id='${account.id}'`);
+    localPermission("revoke", account.id, "planner", source.id);
     await page.reload();
     await expect(page.getByRole("alert")).toContainText(
       "Workspace access required",

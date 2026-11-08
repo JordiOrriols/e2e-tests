@@ -1,7 +1,12 @@
 import { randomUUID } from "node:crypto";
 import { test, expect } from "@playwright/test";
 
-import { localSQL, createLocalAccount } from "./local-helpers";
+import {
+  localSQL,
+  localPermission,
+  createLocalAccount,
+  removeLocalAccount,
+} from "./local-helpers";
 const origin =
   process.env["PLATFORM_DOCKER_WEB"] === "1"
     ? "http://127.0.0.1:5320"
@@ -42,8 +47,13 @@ test("Access-authenticated catalog uses path routes, respects grants and never c
       { headers },
     );
     expect(forbidden.status()).toBe(403);
-    localSQL(`INSERT INTO platform.grants(user_id,app,workspace_id,role)
-      VALUES('${account.id}','shiplog','${source.workspace}','external')`);
+    localPermission(
+      "grant",
+      account.id,
+      "shiplog",
+      source.workspace,
+      "external",
+    );
     await page.reload();
     await page.getByRole("link", { name: source.name, exact: true }).click();
     await expect(page).toHaveURL(
@@ -65,7 +75,7 @@ test("Access-authenticated catalog uses path routes, respects grants and never c
         (url) => url.includes("supabase") || url.includes("/auth/"),
       ),
     ).toBe(false);
-    localSQL(`DELETE FROM platform.grants WHERE user_id='${account.id}'`);
+    localPermission("revoke", account.id, "shiplog", source.workspace);
     await page.reload();
     await expect(page.getByRole("alert")).toContainText(
       "Workspace access required",
@@ -77,8 +87,6 @@ test("Access-authenticated catalog uses path routes, respects grants and never c
     );
     await expect(page.getByRole("button", { name: /sign in/i })).toHaveCount(0);
   } finally {
-    localSQL(`BEGIN; DELETE FROM platform.grants WHERE user_id='${account.id}';
-      DELETE FROM platform.identities WHERE user_id='${account.id}';
-      DELETE FROM platform.users WHERE id='${account.id}'; COMMIT;`);
+    removeLocalAccount(account.id);
   }
 });

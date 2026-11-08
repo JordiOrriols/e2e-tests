@@ -15,6 +15,10 @@ Planner and Shiplog use the same origin at `http://127.0.0.1:5320` under their
 app paths. Tests cover default-deny identities, app/workspace grant boundaries,
 revocation, private-field redaction and deep-route reloads. The Planner API uses
 the real scheduler. Only test-owned platform identity/grant rows are removed.
+Build the backend's `permissions` tools-profile image before running these
+tests (`docker compose --env-file .env -f compose.local.yml build permissions`).
+Browser scenarios grant and revoke their own test accounts through that
+local administrator command, rather than modifying permissions with raw SQL.
 Do not run the historical default configs as migration tests: some authenticate
 and seed against remote services even when the browser URL says localhost.
 

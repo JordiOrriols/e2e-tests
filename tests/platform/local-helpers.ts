@@ -35,6 +35,26 @@ export function localSQL(sql: string): string {
     { cwd: apiDirectory, encoding: "utf8" },
   ).trim();
 }
+export function localPermission(...args: string[]): void {
+  execFileSync(
+    "docker",
+    [
+      "--context",
+      "desktop-linux",
+      "compose",
+      "--env-file",
+      ".env",
+      "-f",
+      "compose.local.yml",
+      "run",
+      "--rm",
+      "--no-deps",
+      "permissions",
+      ...args,
+    ],
+    { cwd: apiDirectory, encoding: "utf8", stdio: "pipe" },
+  );
+}
 export async function createLocalAccount(
   request: APIRequestContext,
   sub: string,
