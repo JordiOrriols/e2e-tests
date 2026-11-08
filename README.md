@@ -69,7 +69,10 @@ independent same-email subjects. Viewer self-decisions do not confer editing
 rights, submitted user IDs cannot impersonate another actor, foreign releases and
 external writes are denied, and revoked participants disappear without removing
 stored decisions. Imported legacy approvals and manual status remain unchanged.
-All 17 isolated migration scenarios pass with one worker and zero retries.
+Audit coverage navigates from the directory, loads 50 then 2 mixed-source events,
+checks expandable details and unmapped legacy actors, stable nonduplicate cursors,
+reload, malformed/foreign cursor errors and external/revoked denial.
+All 18 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
