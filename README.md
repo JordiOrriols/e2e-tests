@@ -91,7 +91,13 @@ revoked-delete errors, foreign-target rejection and persistence after deletion.
 The workspace and grants remain, with legacy automatic-container cleanup disabled
 transactionally. Database integration also verifies surviving member/account/history
 records and Shiplog application retention when its team association clears.
-All 21 isolated migration scenarios pass with one worker and zero retries.
+Ladders creation coverage uses the shared profile form from a team link, verifies
+ID-only response, persistent member-route replacement and directory reload,
+unlinked legacy account and owner storage metadata, viewer/foreign denial and
+visible revoked-save failures with no partial member. Database integration also
+tests direct runtime INSERT denial, retained legacy insert authorization and
+atomic rollback of invalid profiles.
+All 22 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
