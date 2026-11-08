@@ -1,59 +1,18 @@
-import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
-import { resolve } from "node:path";
 import { test, expect } from "@playwright/test";
 
-const apiDirectory = resolve(
-  import.meta.dirname,
-  "../../../backend-access-local/api",
-);
-const origin = process.env["PLATFORM_DOCKER_WEB"] === "1"
-  ? "http://127.0.0.1:5310"
-  : "http://127.0.0.1:5318";
-function localSQL(sql: string): string {
-  return execFileSync(
-    "docker",
-    [
-      "--context",
-      "desktop-linux",
-      "compose",
-      "--env-file",
-      ".env",
-      "-f",
-      "compose.local.yml",
-      "exec",
-      "-T",
-      "db",
-      "psql",
-      "-U",
-      "postgres",
-      "-d",
-      "platform",
-      "-v",
-      "ON_ERROR_STOP=1",
-      "-At",
-      "-c",
-      sql,
-    ],
-    { cwd: apiDirectory, encoding: "utf8" },
-  ).trim();
-}
+import { localSQL, createLocalAccount } from "./local-helpers";
+const origin =
+  process.env["PLATFORM_DOCKER_WEB"] === "1"
+    ? "http://127.0.0.1:5320"
+    : "http://127.0.0.1:5318";
 
 test("Access-authenticated catalog uses path routes, respects grants and never calls Supabase", async ({
   page,
   request,
 }) => {
   const sub = `local-e2e-${randomUUID()}`;
-  const issued = await request.post("http://127.0.0.1:5301/test-token", {
-    data: { sub, email: "catalog-e2e@example.com" },
-  });
-  expect(issued.ok()).toBe(true);
-  const { token } = await issued.json();
-  const headers = { "Cf-Access-Jwt-Assertion": token };
-  const accountResponse = await request.get("/api/me", { headers });
-  expect(accountResponse.status()).toBe(200);
-  const account = await accountResponse.json();
-  expect(account.id).toMatch(/^[0-9a-f-]{36}$/);
+  const { headers, account } = await createLocalAccount(request, sub);
   const source: {
     workspace: string;
     name: string;

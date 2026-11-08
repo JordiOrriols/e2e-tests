@@ -1,5 +1,23 @@
 # E2E Tests
 
+## Local Access migration
+
+`platform-local.config.ts` targets only the isolated local NestJS/PostgreSQL
+stack; it does not use remote Supabase authentication or production projects.
+Start the backend's local Compose stack with `compose.test.yml`, the `web`
+profile, and its local signing fixture. Then run:
+
+```sh
+PLATFORM_DOCKER_WEB=1 npx playwright test --config=platform-local.config.ts
+```
+
+Planner and Shiplog use the same origin at `http://127.0.0.1:5320` under their
+app paths. Tests cover default-deny identities, app/workspace grant boundaries,
+revocation, private-field redaction and deep-route reloads. The Planner API uses
+the real scheduler. Only test-owned platform identity/grant rows are removed.
+Do not run the historical default configs as migration tests: some authenticate
+and seed against remote services even when the browser URL says localhost.
+
 End-to-end testing repository for jordiorriols projects using Playwright.
 
 ## Projects Tested
