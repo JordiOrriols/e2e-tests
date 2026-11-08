@@ -33,6 +33,12 @@ Project coverage reuses the existing manager modal for create/rename/delete,
 checks persisted identity, invalid names, role denial and revocation, and
 verifies that even off-roadmap backlog features disable deletion and cause
 API 409 responses. Project fixtures are isolated and removed transactionally.
+Task coverage reuses the real feature form to create a project/task, save
+estimates and multiple-task dependencies, rename and change status, and reload
+persisted private details. It checks rejected cycles/estimates, confirmation
+cancellation, protected prerequisite deletion, viewer read-only controls,
+external private-data denial, owner deletion and revocation. Delete assertions
+wait for the actual API response, not a temporarily absent rendered card.
 Do not run the historical default configs as migration tests: some authenticate
 and seed against remote services even when the browser URL says localhost.
 
