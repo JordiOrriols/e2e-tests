@@ -44,6 +44,12 @@ changes a planning role and reloads it, clears that role as editor and verifies
 the vacation view excludes the unassigned member from capacity. Editors cannot
 create teams; viewers cannot change roles; cross-workspace/invalid roles are
 rejected and no vacation-copy button is exposed.
+Navigation coverage separates estimation from the official roadmap, checks
+that roadmap loads no private feature/project directory, reloads estimation,
+switches between internal/external-granted workspaces, denies external internal
+views, and verifies workspace-list navigation plus unknown-route handling.
+Task/project editing runs on estimation; inclusion tests navigate back to the
+roadmap for start dates and verify that both views share persisted API state.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation

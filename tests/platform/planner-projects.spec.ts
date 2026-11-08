@@ -33,7 +33,7 @@ test("Planner project modal uses scoped API CRUD and protects projects with back
     for (const role of ["external", "viewer"]) {
       localPermission("grant", account.id, "planner", workspace, role);
       await page.goto(
-        `http://127.0.0.1:5320/planner/workspaces/${workspace}/roadmap`,
+        `http://127.0.0.1:5320/planner/workspaces/${workspace}/estimation`,
       );
       await expect(
         page.getByRole("heading", { name: "Local project E2E", exact: true }),

@@ -39,7 +39,7 @@ test("Planner adds prerequisites before dependants and saves verified start date
       ('${second}','${project}','Dependant',ARRAY['${first}']::uuid[]); COMMIT;`);
     localPermission("grant", account.id, "planner", workspace, "editor");
     await page.goto(
-      `http://127.0.0.1:5320/planner/workspaces/${workspace}/roadmap`,
+      `http://127.0.0.1:5320/planner/workspaces/${workspace}/estimation`,
     );
     await page
       .getByRole("button", { name: "Add feature", exact: true })
@@ -90,12 +90,7 @@ test("Planner adds prerequisites before dependants and saves verified start date
     expect(
       source.features.map((feature: { id: string }) => feature.id),
     ).toEqual([first, second]);
-    await expect(
-      official.getByRole("button", {
-        name: "Reorder Prerequisite",
-        exact: true,
-      }),
-    ).toBeVisible();
+    await expect(official).toHaveCount(0);
     const before = await (
       await request.get(`${path}/features`, { headers })
     ).json();
@@ -115,6 +110,16 @@ test("Planner adds prerequisites before dependants and saves verified start date
       .getByRole("button", { name: "Remove from roadmap", exact: true })
       .click();
     await expect(page.getByRole("alert")).toContainText("must come after");
+    await page.getByRole("link", { name: "Roadmap", exact: true }).click();
+    await expect(
+      official.getByRole("button", {
+        name: "Reorder Prerequisite",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Feature estimation", exact: true }),
+    ).toHaveCount(0);
     const date = page.getByRole("textbox", {
       name: "Plan starts",
       exact: true,
@@ -162,6 +167,10 @@ test("Planner adds prerequisites before dependants and saves verified start date
     ).toHaveValue("2026-03-02");
     localPermission("grant", account.id, "planner", workspace, "viewer");
     await page.reload();
+    await expect(
+      page.getByRole("textbox", { name: "Plan starts", exact: true }),
+    ).toHaveCount(0);
+    await page.getByRole("link", { name: "Estimation", exact: true }).click();
     await expect(
       page.getByRole("heading", { name: "Feature estimation", exact: true }),
     ).toBeVisible();

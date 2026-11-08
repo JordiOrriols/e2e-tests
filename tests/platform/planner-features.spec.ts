@@ -18,7 +18,7 @@ test("Planner reuses task forms for private estimates and dependencies with inte
   const owner = randomUUID(),
     workspace = randomUUID();
   const path = `/api/planner/workspaces/${workspace}/features`;
-  const pageURL = `http://127.0.0.1:5320/planner/workspaces/${workspace}/roadmap`;
+  const pageURL = `http://127.0.0.1:5320/planner/workspaces/${workspace}/estimation`;
   await page.setExtraHTTPHeaders(headers);
   await page.addInitScript(() => localStorage.setItem("i18nextLng", "en"));
   await page.route("**/*", async (route) => {
