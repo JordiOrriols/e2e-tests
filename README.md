@@ -104,7 +104,15 @@ viewer/foreign/invalid/revoked moves and visible errors without changing teams.
 Database integration additionally verifies preserved linked accounts, goals,
 evaluations, invitations and vacations; linked-account conflicts roll back,
 same-team calls are idempotent and legacy owner/unauthenticated checks remain.
-All 23 isolated migration scenarios pass with one worker and zero retries.
+Ladders evaluation-history coverage follows the profile's Versions link, reuses
+version selection/comparisons, reloads a hash-free deep link and checks the
+language selector/footer and profile navigation. It verifies manager/peer and
+published self history, excludes private self drafts from both API and DOM,
+keeps status/deletion controls disabled, rejects foreign/invalid/revoked access
+and preserves every imported evaluation field. Database integration additionally
+checks all internal roles, same-email identity isolation, cross-app denial and
+direct runtime SELECT denial; internal hidden comments remain reviewer-visible.
+All 24 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
