@@ -97,7 +97,14 @@ unlinked legacy account and owner storage metadata, viewer/foreign denial and
 visible revoked-save failures with no partial member. Database integration also
 tests direct runtime INSERT denial, retained legacy insert authorization and
 atomic rollback of invalid profiles.
-All 22 isolated migration scenarios pass with one worker and zero retries.
+Ladders move coverage selects a destination using UI's shared team selector,
+checks no write before explicit save, reloads the persistent association and
+verifies profile/tokens/history retention and directory placement. It checks
+viewer/foreign/invalid/revoked moves and visible errors without changing teams.
+Database integration additionally verifies preserved linked accounts, goals,
+evaluations, invitations and vacations; linked-account conflicts roll back,
+same-team calls are idempotent and legacy owner/unauthenticated checks remain.
+All 23 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation

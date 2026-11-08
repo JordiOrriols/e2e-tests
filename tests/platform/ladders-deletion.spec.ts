@@ -139,6 +139,7 @@ test("Ladders deletion requires confirmed ownership and protects nonempty/defaul
     await expect(page).toHaveURL(
       `http://127.0.0.1:5320/ladders/workspaces/${workspace}/teams`,
     );
+    await expect(page.getByRole("alertdialog")).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Delete member", exact: true }),
     ).toHaveCount(0);
