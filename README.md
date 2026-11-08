@@ -50,6 +50,11 @@ switches between internal/external-granted workspaces, denies external internal
 views, and verifies workspace-list navigation plus unknown-route handling.
 Task/project editing runs on estimation; inclusion tests navigate back to the
 roadmap for start dates and verify that both views share persisted API state.
+Shiplog application coverage uses the existing modal to create and rename an
+application, assign/clear its team, reload persisted identity and confirm empty
+deletion. It verifies invalid fields, cross-workspace IDs, viewer/external/
+revoked denial, release-protected deletion and platform-owned audit records.
+Fixtures are isolated, including audit events; production data is untouched.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation

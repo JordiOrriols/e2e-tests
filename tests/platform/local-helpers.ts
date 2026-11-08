@@ -74,6 +74,7 @@ export async function createLocalAccount(
 export function removeLocalAccount(id: string) {
   if (!/^[0-9a-f-]{36}$/.test(id)) throw new Error("Invalid test account ID");
   localSQL(`BEGIN; DELETE FROM platform.grants WHERE user_id='${id}';
+    DELETE FROM platform.shiplog_audit_events WHERE actor_id='${id}';
     DELETE FROM platform.planner_priority_proposals WHERE created_by='${id}';
     DELETE FROM platform.identities WHERE user_id='${id}';
     DELETE FROM platform.users WHERE id='${id}'; COMMIT;`);
