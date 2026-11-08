@@ -64,7 +64,12 @@ Checklist coverage uses the existing template editor and QA modal. It verifies
 owner-only template editing, future-only snapshots, stale-save errors and reload,
 check completion/reload/clearing, platform actor storage without modifying legacy
 completion, viewer read-only QA, external denial and unchanged manual release status.
-All 16 isolated migration scenarios pass with one worker and zero retries.
+Approval coverage uses the existing thumbs controls, reloads decisions and checks
+independent same-email subjects. Viewer self-decisions do not confer editing
+rights, submitted user IDs cannot impersonate another actor, foreign releases and
+external writes are denied, and revoked participants disappear without removing
+stored decisions. Imported legacy approvals and manual status remain unchanged.
+All 17 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation

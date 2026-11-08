@@ -76,6 +76,7 @@ export function removeLocalAccount(id: string) {
   localSQL(`BEGIN; DELETE FROM platform.grants WHERE user_id='${id}';
     DELETE FROM platform.shiplog_audit_events WHERE actor_id='${id}';
     DELETE FROM platform.shiplog_checklist_completions WHERE actor_id='${id}';
+    DELETE FROM platform.shiplog_release_decisions WHERE user_id='${id}';
     DELETE FROM platform.planner_priority_proposals WHERE created_by='${id}';
     DELETE FROM platform.identities WHERE user_id='${id}';
     DELETE FROM platform.users WHERE id='${id}'; COMMIT;`);
