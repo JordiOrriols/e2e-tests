@@ -7,7 +7,7 @@ import {
   removeLocalAccount,
 } from "./local-helpers";
 
-test("Planner experiments drag pending tasks, recalculate dates and save workspace-scoped snapshots", async ({
+test("Planner experiments persist snapshots and only editors can confirm official priorities", async ({
   page,
   request,
 }) => {
@@ -62,6 +62,17 @@ test("Planner experiments drag pending tasks, recalculate dates and save workspa
     const officialResponse = await request.get(`${path}/roadmap`, { headers });
     expect(officialResponse.status()).toBe(200);
     const official = await officialResponse.json();
+    const applyLabel = "Apply priorities to official plan";
+    expect(
+      (
+        await request.post(`${path}/priorities`, {
+          data: {
+            featureIds: [done, progress, beta, alpha, dependent],
+            expectedRevision: official.revision,
+          },
+        })
+      ).status(),
+    ).toBe(401);
     const priorityBefore =
       localSQL(`SELECT json_agg(json_build_object('id',id,'priority',priority) ORDER BY priority)
       FROM public.features WHERE project_id='${project}'`);
@@ -76,6 +87,9 @@ test("Planner experiments drag pending tasks, recalculate dates and save workspa
       page.getByRole("button", { name: "Reorder In progress", exact: true }),
     ).toHaveCount(0);
     await expect(page.getByRole("button", { name: /^Reorder/ })).toHaveCount(3);
+    await expect(
+      page.getByRole("button", { name: applyLabel, exact: true }),
+    ).toHaveCount(0);
     const label = (name: string) =>
       page
         .locator('[draggable="true"]')
@@ -129,6 +143,17 @@ test("Planner experiments drag pending tasks, recalculate dates and save workspa
       await request.get(`${path}/proposals/${proposals[0].id}`, { headers })
     ).json();
     expect(saved).toEqual(preview);
+    expect(
+      (
+        await request.post(`${path}/priorities`, {
+          headers,
+          data: {
+            featureIds: [done, progress, beta, alpha, dependent],
+            expectedRevision: official.revision,
+          },
+        })
+      ).status(),
+    ).toBe(403);
     expect(Object.keys(saved).sort()).toEqual([
       "features",
       "markers",
@@ -156,6 +181,17 @@ test("Planner experiments drag pending tasks, recalculate dates and save workspa
       ).status(),
     ).toBe(403);
     localPermission("grant", other.account.id, "planner", workspace, "viewer");
+    expect(
+      (
+        await request.post(`${path}/priorities`, {
+          headers: other.headers,
+          data: {
+            featureIds: [done, progress, beta, alpha, dependent],
+            expectedRevision: official.revision,
+          },
+        })
+      ).status(),
+    ).toBe(403);
     expect(
       await (
         await request.get(`${path}/proposals/${proposals[0].id}`, {
@@ -268,11 +304,117 @@ test("Planner experiments drag pending tasks, recalculate dates and save workspa
         await request.get(`${path}/proposals/${proposals[0].id}`, { headers })
       ).json(),
     ).toEqual(saved);
+    localPermission("grant", account.id, "planner", workspace, "editor");
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: applyLabel, exact: true }),
+    ).toBeDisabled();
+    await page
+      .getByRole("combobox", { name: "View saved proposal", exact: true })
+      .click();
+    await page
+      .getByRole("option", { name: "Alternative A", exact: true })
+      .click();
+    await expect(
+      page.getByRole("heading", { name: "Alternative A", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: applyLabel, exact: true }),
+    ).toBeDisabled();
+    await page
+      .getByRole("button", {
+        name: "Try these priorities on the current plan",
+        exact: true,
+      })
+      .click();
+    await expect(page.getByRole("status")).toContainText(
+      "Temporary experiment",
+    );
+    await page.getByRole("button", { name: applyLabel, exact: true }).click();
+    await expect(dialog).toContainText("saved proposals remain unchanged");
+    await dialog.getByRole("button", { name: "Cancel", exact: true }).click();
+    expect(
+      localSQL(`SELECT json_agg(json_build_object('id',id,'priority',priority) ORDER BY priority)
+      FROM public.features WHERE project_id='${project}'`),
+    ).toBe(priorityBefore);
+    await page.getByRole("button", { name: applyLabel, exact: true }).click();
+    const appliedResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith(`${path}/priorities`) &&
+        response.request().method() === "POST",
+    );
+    await dialog.getByRole("button", { name: applyLabel, exact: true }).click();
+    const appliedHTTP = await appliedResponse;
+    expect(appliedHTTP.status()).toBe(201);
+    const applied = await appliedHTTP.json();
+    expect(Object.keys(applied).sort()).toEqual([
+      "features",
+      "markers",
+      "name",
+      "revision",
+      "startDate",
+    ]);
+    expect(
+      applied.features.map((feature: { id: string }) => feature.id),
+    ).toEqual([done, progress, beta, alpha, dependent]);
+    expect(applied.revision).not.toBe(official.revision);
+    await expect(
+      page.getByRole("heading", { name: "Official plan", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: applyLabel, exact: true }),
+    ).toBeDisabled();
+    await expect(
+      page.getByText(
+        "Temporary experiment. The official priorities have not changed.",
+        { exact: true },
+      ),
+    ).toHaveCount(0);
+    await page.reload();
+    expect(
+      await (
+        await request.get(`${path}/roadmap`, { headers: other.headers })
+      ).json(),
+    ).toEqual(applied);
+    expect(
+      await (
+        await request.get(`${path}/proposals/${proposals[0].id}`, { headers })
+      ).json(),
+    ).toEqual(saved);
+    expect(
+      JSON.parse(
+        localSQL(
+          `SELECT json_agg(id ORDER BY priority) FROM public.features WHERE project_id='${project}'`,
+        ),
+      ),
+    ).toEqual([done, progress, beta, alpha, dependent]);
+    expect(
+      (
+        await request.post(`${path}/priorities`, {
+          headers,
+          data: {
+            featureIds: [done, progress, alpha, beta, dependent],
+            expectedRevision: official.revision,
+          },
+        })
+      ).status(),
+    ).toBe(409);
     localPermission("revoke", account.id, "planner", workspace);
     for (const suffix of ["/proposals", `/proposals/${proposals[0].id}`])
       expect(
         (await request.get(`${path}${suffix}`, { headers })).status(),
       ).toBe(403);
+    expect(
+      (
+        await request.post(`${path}/priorities`, {
+          headers,
+          data: {
+            featureIds: [done, progress, alpha, beta, dependent],
+            expectedRevision: applied.revision,
+          },
+        })
+      ).status(),
+    ).toBe(403);
     await page.reload();
     await expect(page.getByRole("alert")).toContainText(
       "Workspace access required",

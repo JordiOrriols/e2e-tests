@@ -23,9 +23,16 @@ Planner proposal coverage uses only a test-owned workspace/member/features:
 real drag-and-drop, changed forecast dates, locked tasks, dependencies, named
 snapshot persistence/restore/compare, same-email identity isolation,
 cross-app grants, stale saves, revocation and unchanged official priorities.
+The same scenario then verifies explicit editor confirmation/cancellation,
+official priority persistence across reloads, preserved saved snapshots,
+external/viewer write denial and stale/revoked official-write rejection.
 Marker coverage reuses the real manager modal, verifies create/rename/delete,
 identity/date preservation, invalid inputs and owner/editor versus viewer/
 external access. All marker fixtures live only in test-owned local workspaces.
+Project coverage reuses the existing manager modal for create/rename/delete,
+checks persisted identity, invalid names, role denial and revocation, and
+verifies that even off-roadmap backlog features disable deletion and cause
+API 409 responses. Project fixtures are isolated and removed transactionally.
 Do not run the historical default configs as migration tests: some authenticate
 and seed against remote services even when the browser URL says localhost.
 
