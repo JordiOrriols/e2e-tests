@@ -19,6 +19,13 @@ Build the backend's `permissions` tools-profile image before running these
 tests (`docker compose --env-file .env -f compose.local.yml build permissions`).
 Browser scenarios grant and revoke their own test accounts through that
 local administrator command, rather than modifying permissions with raw SQL.
+Planner proposal coverage uses only a test-owned workspace/member/features:
+real drag-and-drop, changed forecast dates, locked tasks, dependencies, named
+snapshot persistence/restore/compare, same-email identity isolation,
+cross-app grants, stale saves, revocation and unchanged official priorities.
+Marker coverage reuses the real manager modal, verifies create/rename/delete,
+identity/date preservation, invalid inputs and owner/editor versus viewer/
+external access. All marker fixtures live only in test-owned local workspaces.
 Do not run the historical default configs as migration tests: some authenticate
 and seed against remote services even when the browser URL says localhost.
 

@@ -80,7 +80,14 @@ test("Planner uses one-origin path routing, server scheduling and explicit exter
         page.getByTitle(feature.name, { exact: true }).first(),
       ).toBeVisible();
     }
-    await expect(page.getByRole("button", { name: /^Reorder/ })).toHaveCount(0);
+    const lastLocked = roadmap.features.reduce(
+      (last: number, feature: { status: string }, index: number) =>
+        ["done", "in_progress"].includes(feature.status) ? index : last,
+      -1,
+    );
+    await expect(page.getByRole("button", { name: /^Reorder/ })).toHaveCount(
+      roadmap.features.length - lastLocked - 1,
+    );
     await page.reload();
     await expect(
       page.getByRole("heading", { name: source.name, exact: true }),
