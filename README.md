@@ -39,6 +39,9 @@ persisted private details. It checks rejected cycles/estimates, confirmation
 cancellation, protected prerequisite deletion, viewer read-only controls,
 external private-data denial, owner deletion and revocation. Delete assertions
 wait for the actual API response, not a temporarily absent rendered card.
+Roadmap settings coverage verifies prerequisite-first inclusion in the reused
+modal, blocked prerequisite removal, persisted start dates, rejected impossible/
+unverified dates, unchanged task fields and viewer/revoked write denial.
 Do not run the historical default configs as migration tests: some authenticate
 and seed against remote services even when the browser URL says localhost.
 
