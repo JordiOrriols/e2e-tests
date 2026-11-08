@@ -181,6 +181,96 @@ test("Planner vacation ranges and sprint calibration persist through the API wit
       }),
     ).toHaveValue("12.5");
     await modal.getByRole("button", { name: "Cancel", exact: true }).click();
+    await page
+      .getByRole("link", { name: "Team configuration", exact: true })
+      .click();
+    await expect(page).toHaveURL(
+      new RegExp(`/planner/workspaces/${workspace}/configuration$`),
+    );
+    await expect(
+      page.getByRole("button", { name: /Copy vacation link/ }),
+    ).toHaveCount(0);
+    await page
+      .getByRole("textbox", { name: "New team name", exact: true })
+      .fill("  Added calendar team  ");
+    const createTeam = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/teams") &&
+        response.request().method() === "POST",
+    );
+    await page.getByRole("button", { name: "Add team", exact: true }).click();
+    expect((await createTeam).status()).toBe(201);
+    await expect(
+      page.getByText("Added calendar team", { exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("combobox", {
+        name: "Planning role for Local calendar developer",
+        exact: true,
+      })
+      .click();
+    const roleWrite = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/planning-role") &&
+        response.request().method() === "PATCH",
+    );
+    await page.getByRole("option", { name: "QA", exact: true }).click();
+    expect((await roleWrite).status()).toBe(200);
+    await page.reload();
+    await expect(
+      page.getByRole("combobox", {
+        name: "Planning role for Local calendar developer",
+        exact: true,
+      }),
+    ).toContainText("QA");
+    expect(
+      (
+        await request.patch(`${path}/members/${stranger}/planning-role`, {
+          headers,
+          data: { role: "backend" },
+        })
+      ).status(),
+    ).toBe(404);
+    expect(
+      (
+        await request.patch(`${path}/members/${member}/planning-role`, {
+          headers,
+          data: { role: "owner" },
+        })
+      ).status(),
+    ).toBe(400);
+    localPermission("grant", account.id, "planner", workspace, "editor");
+    await page.reload();
+    await expect(
+      page.getByRole("button", { name: "Add team", exact: true }),
+    ).toHaveCount(0);
+    expect(
+      (
+        await request.post(`${path}/teams`, {
+          headers,
+          data: { name: "Editor team" },
+        })
+      ).status(),
+    ).toBe(403);
+    await page
+      .getByRole("combobox", {
+        name: "Planning role for Local calendar developer",
+        exact: true,
+      })
+      .click();
+    const unassign = page.waitForResponse(
+      (response) =>
+        response.url().endsWith("/planning-role") &&
+        response.request().method() === "PATCH",
+    );
+    await page.getByRole("option", { name: "Unassigned", exact: true }).click();
+    expect((await unassign).status()).toBe(200);
+    await page
+      .getByRole("link", { name: "Team Vacations", exact: true })
+      .click();
+    await expect(page.getByRole("status")).toContainText(
+      "1 member has no planning role",
+    );
     expect(
       (
         await request.patch(`${path}/calibration`, {
@@ -208,6 +298,23 @@ test("Planner vacation ranges and sprint calibration persist through the API wit
     ).toBeDisabled();
     expect(
       (
+        await request.patch(`${path}/members/${member}/planning-role`, {
+          headers,
+          data: { role: "qa" },
+        })
+      ).status(),
+    ).toBe(403);
+    await page
+      .getByRole("link", { name: "Team configuration", exact: true })
+      .click();
+    await expect(
+      page.getByRole("combobox", {
+        name: "Planning role for Local calendar developer",
+        exact: true,
+      }),
+    ).toBeDisabled();
+    expect(
+      (
         await request.post(`${path}/members/${member}/vacations`, {
           headers,
           data: { start: "2026-03-02", end: "2026-03-04", working: true },
@@ -231,7 +338,7 @@ test("Planner vacation ranges and sprint calibration persist through the API wit
     localSQL(`BEGIN;
       DELETE FROM public.vacations WHERE member_id IN ('${member}','${stranger}');
       DELETE FROM public.members WHERE id IN ('${member}','${stranger}');
-      DELETE FROM public.teams WHERE id IN ('${team}','${otherTeam}');
+      DELETE FROM public.teams WHERE workspace_id IN ('${workspace}','${other}');
       DELETE FROM public.workspaces WHERE id IN ('${workspace}','${other}');
       DELETE FROM auth.users WHERE id='${owner}';
       COMMIT;`);

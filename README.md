@@ -39,6 +39,11 @@ and reloads calibration. It checks exact input/date boundaries, cross-workspace
 member isolation, roster redaction, viewer/external denial and revocation.
 All calendar members, teams and vacations are test-owned; no personal vacation
 link or remote service is used.
+The same scenario navigates to team configuration, creates a team as owner,
+changes a planning role and reloads it, clears that role as editor and verifies
+the vacation view excludes the unassigned member from capacity. Editors cannot
+create teams; viewers cannot change roles; cross-workspace/invalid roles are
+rejected and no vacation-copy button is exposed.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
