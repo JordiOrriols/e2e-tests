@@ -11,7 +11,7 @@ profile, and its local signing fixture. Then run:
 PLATFORM_DOCKER_WEB=1 npx playwright test --config=platform-local.config.ts
 ```
 
-Planner and Shiplog use the same origin at `http://127.0.0.1:5320` under their
+Planner, Shiplog and Ladders use the same origin at `http://127.0.0.1:5320` under their
 app paths. Tests cover default-deny identities, app/workspace grant boundaries,
 revocation, private-field redaction and deep-route reloads. The Planner API uses
 the real scheduler. Only test-owned platform identity/grant rows are removed.
@@ -72,7 +72,14 @@ stored decisions. Imported legacy approvals and manual status remain unchanged.
 Audit coverage navigates from the directory, loads 50 then 2 mixed-source events,
 checks expandable details and unmapped legacy actors, stable nonduplicate cursors,
 reload, malformed/foreign cursor errors and external/revoked denial.
-All 18 isolated migration scenarios pass with one worker and zero retries.
+Ladders coverage opens the authenticated workspace/team directory, reuses the
+shared name alert dialog for create/rename and reloads persisted results. It
+checks profile-only field shapes, owner/editor/viewer boundaries, cross-app
+grant isolation, invalid/foreign writes, revocation, hash-free deep links and
+removal of anonymous evaluation/password routes from the runtime. All fixture
+members/teams/workspaces are local and removed; legacy identity linking is never
+inferred from email.
+All 19 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
