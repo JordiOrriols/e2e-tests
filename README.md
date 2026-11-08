@@ -55,6 +55,12 @@ application, assign/clear its team, reload persisted identity and confirm empty
 deletion. It verifies invalid fields, cross-workspace IDs, viewer/external/
 revoked denial, release-protected deletion and platform-owned audit records.
 Fixtures are isolated, including audit events; production data is untouched.
+Shiplog release coverage uses the shared form to stage feature links without
+writing, create and reload a draft, save unlinking with a QA status change, then
+update notes/status with locked version/title fields. It checks stable identity/
+creation time, platform-owned audits, duplicate/invalid versions, foreign feature
+rejection, viewer inspection without saving and external catalog-only access.
+All 15 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
