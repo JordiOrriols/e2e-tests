@@ -33,6 +33,12 @@ Project coverage reuses the existing manager modal for create/rename/delete,
 checks persisted identity, invalid names, role denial and revocation, and
 verifies that even off-roadmap backlog features disable deletion and cause
 API 409 responses. Project fixtures are isolated and removed transactionally.
+Calendar coverage navigates from the real roadmap, saves a vacation range,
+reloads its indicators, restores one working day, saves decimal sprint points
+and reloads calibration. It checks exact input/date boundaries, cross-workspace
+member isolation, roster redaction, viewer/external denial and revocation.
+All calendar members, teams and vacations are test-owned; no personal vacation
+link or remote service is used.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
