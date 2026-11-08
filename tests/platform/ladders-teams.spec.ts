@@ -67,6 +67,7 @@ test("Ladders authenticated team directory reuses name dialogs and enforces expl
       "planning_role",
       "role",
       "team_id",
+      "template_id",
     ]);
     await page
       .getByRole("button", { name: "Create team", exact: true })

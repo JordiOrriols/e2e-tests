@@ -79,7 +79,13 @@ grant isolation, invalid/foreign writes, revocation, hash-free deep links and
 removal of anonymous evaluation/password routes from the runtime. All fixture
 members/teams/workspaces are local and removed; legacy identity linking is never
 inferred from email.
-All 19 isolated migration scenarios pass with one worker and zero retries.
+Ladders profile coverage reuses the assessment's profile fields, planning-role
+selector and seniority template picker, saves/reloads and verifies immutable
+legacy tokens, account/owner IDs, creation dates and evaluation history. It checks
+editor saving, viewer read-only fields, foreign/missing member rejection, invalid
+inputs and visible save errors after revocation. Planning-role changes update the
+Planner roster only under its separate app grant.
+All 20 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
