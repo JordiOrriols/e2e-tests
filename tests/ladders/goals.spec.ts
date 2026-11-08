@@ -17,6 +17,8 @@ test.describe("Ladders goals @goals", () => {
     await seedMember(data, memberName);
     await app.gotoHome();
     await app.openGoals(memberName);
+    await expect(page.getByTestId("goal-create-form").locator('[data-slot="form-field"]')).toHaveCount(3);
+    await expect(page.getByTestId("goal-description-input")).toHaveAttribute("data-slot", "textarea");
 
     await app.createGoal({
       title,

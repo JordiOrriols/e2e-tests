@@ -1,4 +1,5 @@
 import { test, expect, type BrowserContext } from "@playwright/test";
+import { expectPublicLayout } from "../shared/public-layout";
 import {
   addFeatures,
   api,
@@ -82,6 +83,7 @@ test("public roadmap stays live, hides technical inputs, and can be revoked", as
     await page.goto(link);
     const response = await loaded;
     expect(response.status()).toBe(200);
+    await expectPublicLayout(page);
     const payload = await response.json();
     expect(Object.keys(payload).sort()).toEqual([
       "features",

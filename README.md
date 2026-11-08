@@ -45,6 +45,32 @@ unverified dates, unchanged task fields and viewer/revoked write denial.
 Do not run the historical default configs as migration tests: some authenticate
 and seed against remote services even when the browser URL says localhost.
 
+## Shared account and public-link layouts
+
+`tests/ui/account-public-layout.spec.ts` checks shared account/login error
+localization and recovery, signup confirmation, password reset, OAuth failures,
+public-frame mobile language controls, restricted-write callbacks, one
+header/main/footer, and exact short/long footer geometry. Storybook callbacks
+are local examples; these tests never authenticate against a production account.
+
+With the UI built Storybook preview on port 6008:
+
+```sh
+npx playwright test tests/ui/account-public-layout.spec.ts --project=ui-localhost --workers=1
+```
+
+## Shared app-shell composition
+
+`tests/ui/app-shell.spec.ts` validates the built UI AppShell Storybook examples.
+It covers desktop/mobile navigation, keyboard language selection, localized
+contribution links, caller-owned account actions, short-page footer placement,
+long-page document scrolling, and full-width main overrides.
+Start the UI built Storybook preview on port 6008, then run:
+
+```sh
+npx playwright test tests/ui/app-shell.spec.ts --project=ui-localhost --workers=1
+```
+
 End-to-end testing repository for jordiorriols projects using Playwright.
 
 ## Projects Tested
@@ -56,6 +82,7 @@ End-to-end testing repository for jordiorriols projects using Playwright.
 | Ladders | https://ladders.jordiorriols.cat | http://localhost:5175 |
 | Planner | Not configured | http://127.0.0.1:5176 |
 | Shiplog | Not configured | http://127.0.0.1:5178 |
+| UI Storybook | Not configured | http://127.0.0.1:6008 |
 
 ## Setup
 
@@ -68,6 +95,19 @@ npx playwright install
 ```
 
 ## Running Tests
+
+### Shared UI forms
+
+Serve the UI repository's built Storybook on port 6008 (or set `UI_LOCAL_URL`),
+then run `npx playwright test form-fields.spec.ts --project=ui-localhost`.
+The suite verifies shared field labels, hint/error associations, native form
+validation, submitted values, reset, disabled controls and desktop/mobile sizing.
+The existing global auth setup still requires the standard test-account environment.
+
+Shared error boundaries/states are covered by
+`npx playwright test error-states.spec.ts --project=ui-localhost` against the
+same built UI Storybook. The suite verifies diagnostics, explicit keyboard
+recovery, disabled retry and desktop/mobile fallback readability.
 
 ### All Tests
 ```bash

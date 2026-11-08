@@ -192,9 +192,9 @@ test.describe("Planner feature estimation", () => {
     // Same footer row, Save on the right where Close used to be.
     expect(Math.abs(saveBox!.y - discardBox!.y)).toBeLessThan(2);
     expect(saveBox!.x).toBeGreaterThan(discardBox!.x + discardBox!.width - 1);
-    await expect(dialog.getByLabel("Project", { exact: true })).toHaveValue(
-      /.+/,
-    );
+    await expect(dialog.getByRole("combobox", { name: "Project", exact: true })).toHaveText("Search");
+    await expect(dialog.locator('[data-slot="form-field"]')).toHaveCount(4);
+    await expect(dialog.getByLabel("Description", { exact: true })).toHaveAttribute("data-slot", "textarea");
 
     await dialog.getByLabel("Name", { exact: true }).fill("Discarded name");
     await discard.click();
@@ -208,9 +208,9 @@ test.describe("Planner feature estimation", () => {
       "Search filters",
     );
     await dialog.getByLabel("Name", { exact: true }).fill("Faceted search");
-    await dialog
-      .getByLabel("Project", { exact: true })
-      .selectOption({ label: "Payments" });
+    await dialog.getByLabel("Description", { exact: true }).fill("Persistent description");
+    await dialog.getByRole("combobox", { name: "Project", exact: true }).click();
+    await page.getByRole("option", { name: "Payments", exact: true }).click();
     await dialog.getByLabel("Backend weeks", { exact: true }).fill("3");
     await save.click();
     await expect(dialog).toBeHidden();
@@ -225,6 +225,8 @@ test.describe("Planner feature estimation", () => {
     await expect
       .poll(() => cardsIn(page, "Roadmap"))
       .toEqual(["Checkout", "Faceted search"]);
+    await page.getByRole("button", { name: "Edit Faceted search", exact: true }).click();
+    await expect(dialog.getByLabel("Description", { exact: true })).toHaveValue("Persistent description");
   });
 
   test("main projects are managed from the estimation page and offered in the feature form", async () => {
@@ -252,9 +254,8 @@ test.describe("Planner feature estimation", () => {
       .getByRole("button", { name: "New feature", exact: true })
       .click();
     await dialog.getByLabel("Name", { exact: true }).fill("Referrals");
-    await dialog
-      .getByLabel("Project", { exact: true })
-      .selectOption({ label: "Growth" });
+    await dialog.getByRole("combobox", { name: "Project", exact: true }).click();
+    await page.getByRole("option", { name: "Growth", exact: true }).click();
     await dialog.getByLabel("Frontend people", { exact: true }).fill("1");
     await dialog.getByLabel("Frontend weeks", { exact: true }).fill("2");
     await dialog

@@ -81,6 +81,15 @@ export default defineConfig({
   /* Configure projects for each app and environment */
   projects: [
     {
+      name: "ui-localhost",
+      testDir: "./tests/ui",
+      use: {
+        ...devices["Desktop Chrome"],
+        baseURL: process.env.UI_LOCAL_URL ?? "http://127.0.0.1:6008",
+      },
+      metadata: { project: "ui", environment: "localhost" },
+    },
+    {
       name: "shiplog-localhost",
       testDir: "./tests/shiplog",
       timeout: 60_000,
