@@ -85,7 +85,13 @@ legacy tokens, account/owner IDs, creation dates and evaluation history. It chec
 editor saving, viewer read-only fields, foreign/missing member rejection, invalid
 inputs and visible save errors after revocation. Planning-role changes update the
 Planner roster only under its separate app grant.
-All 20 isolated migration scenarios pass with one worker and zero retries.
+Ladders deletion coverage checks owner-only controls/API, cancellation before any
+write, member-record cascades, disabled nonempty teams, visible default-team and
+revoked-delete errors, foreign-target rejection and persistence after deletion.
+The workspace and grants remain, with legacy automatic-container cleanup disabled
+transactionally. Database integration also verifies surviving member/account/history
+records and Shiplog application retention when its team association clears.
+All 21 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
