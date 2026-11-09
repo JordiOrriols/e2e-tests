@@ -155,7 +155,14 @@ Peer-review coverage assigns a linked verified colleague with the shared selecto
 submits one private review through the reused assessment editor, verifies no
 directory/history access, checks independent manager publication, duplicate
 conflicts and revoked-assignment denial without deleting submitted evaluations.
-All 33 isolated migration scenarios pass with one worker and zero retries.
+Member invitation coverage uses the manager profile panel and recipient's own
+account-ID page. It verifies invitation creation/revocation, same-email recipient
+isolation, decline/accept, personal self autosave without legacy mapping, no
+workspace grants, and confirmed unlink with preserved evaluation history.
+Database integration also covers expiry, rotation, concurrent one-use acceptance,
+duplicate-team links, legacy-mapping conflicts and peer submissions by directly
+linked accounts.
+All 34 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
