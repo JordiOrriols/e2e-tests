@@ -162,7 +162,16 @@ workspace grants, and confirmed unlink with preserved evaluation history.
 Database integration also covers expiry, rotation, concurrent one-use acceptance,
 duplicate-team links, legacy-mapping conflicts and peer submissions by directly
 linked accounts.
-All 34 isolated migration scenarios pass with one worker and zero retries.
+Workspace lifecycle coverage creates a native workspace from the shared name
+dialog without changing legacy auth account counts. It invites an exact recipient
+as Planner external, verifies wrong-subject denial, accepts once, checks Planner
+read-only navigation with no Ladders grant, changes/removes the app role, creates
+native teams/members, rejects nonempty deletion and confirms/cancels empty deletion.
+Planner and Shiplog links reach the same management screen. Database integration
+also covers expiry, rotation, decline, concurrent consumption, owner protection,
+legacy ownership preservation, runtime privilege denial, audit retention and
+explicit busy conflicts instead of grant/workspace deadlocks.
+All 35 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
