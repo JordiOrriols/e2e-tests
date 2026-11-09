@@ -1,5 +1,195 @@
 # E2E Tests
 
+## Local Access migration
+
+`platform-local.config.ts` targets only the isolated local NestJS/PostgreSQL
+stack; it does not use remote Supabase authentication or production projects.
+Start the backend's local Compose stack with `compose.test.yml`, the `web`
+profile, and its local signing fixture. Then run:
+
+```sh
+PLATFORM_DOCKER_WEB=1 npx playwright test --config=platform-local.config.ts
+```
+
+Planner, Shiplog, Ladders and Pulse use the same origin at `http://127.0.0.1:5320` under their
+app paths. Tests cover default-deny identities, app/workspace grant boundaries,
+revocation, private-field redaction and deep-route reloads. The Planner API uses
+the real scheduler. Only test-owned platform identity/grant rows are removed.
+Build the backend's `permissions` tools-profile image before running these
+tests (`docker compose --env-file .env -f compose.local.yml build permissions`).
+Browser scenarios grant and revoke their own test accounts through that
+local administrator command, rather than modifying permissions with raw SQL.
+Planner proposal coverage uses only a test-owned workspace/member/features:
+real drag-and-drop, changed forecast dates, locked tasks, dependencies, named
+snapshot persistence/restore/compare, same-email identity isolation,
+cross-app grants, stale saves, revocation and unchanged official priorities.
+The same scenario then verifies explicit editor confirmation/cancellation,
+official priority persistence across reloads, preserved saved snapshots,
+external/viewer write denial and stale/revoked official-write rejection.
+Marker coverage reuses the real manager modal, verifies create/rename/delete,
+identity/date preservation, invalid inputs and owner/editor versus viewer/
+external access. All marker fixtures live only in test-owned local workspaces.
+Project coverage reuses the existing manager modal for create/rename/delete,
+checks persisted identity, invalid names, role denial and revocation, and
+verifies that even off-roadmap backlog features disable deletion and cause
+API 409 responses. Project fixtures are isolated and removed transactionally.
+Calendar coverage navigates from the real roadmap, saves a vacation range,
+reloads its indicators, restores one working day, saves decimal sprint points
+and reloads calibration. It checks exact input/date boundaries, cross-workspace
+member isolation, roster redaction, viewer/external denial and revocation.
+All calendar members, teams and vacations are test-owned; no personal vacation
+link or remote service is used.
+The same scenario navigates to team configuration, creates a team as owner,
+changes a planning role and reloads it, clears that role as editor and verifies
+the vacation view excludes the unassigned member from capacity. Editors cannot
+create teams; viewers cannot change roles; cross-workspace/invalid roles are
+rejected and no vacation-copy button is exposed.
+Navigation coverage separates estimation from the official roadmap, checks
+that roadmap loads no private feature/project directory, reloads estimation,
+switches between internal/external-granted workspaces, denies external internal
+views, and verifies workspace-list navigation plus unknown-route handling.
+Task/project editing runs on estimation; inclusion tests navigate back to the
+roadmap for start dates and verify that both views share persisted API state.
+Shiplog application coverage uses the existing modal to create and rename an
+application, assign/clear its team, reload persisted identity and confirm empty
+deletion. It verifies invalid fields, cross-workspace IDs, viewer/external/
+revoked denial, release-protected deletion and platform-owned audit records.
+Fixtures are isolated, including audit events; production data is untouched.
+Shiplog release coverage uses the shared form to stage feature links without
+writing, create and reload a draft, save unlinking with a QA status change, then
+update notes/status with locked version/title fields. It checks stable identity/
+creation time, platform-owned audits, duplicate/invalid versions, foreign feature
+rejection, viewer inspection without saving and external catalog-only access.
+Checklist coverage uses the existing template editor and QA modal. It verifies
+owner-only template editing, future-only snapshots, stale-save errors and reload,
+check completion/reload/clearing, platform actor storage without modifying legacy
+completion, viewer read-only QA, external denial and unchanged manual release status.
+Approval coverage uses the existing thumbs controls, reloads decisions and checks
+independent same-email subjects. Viewer self-decisions do not confer editing
+rights, submitted user IDs cannot impersonate another actor, foreign releases and
+external writes are denied, and revoked participants disappear without removing
+stored decisions. Imported legacy approvals and manual status remain unchanged.
+Audit coverage navigates from the directory, loads 50 then 2 mixed-source events,
+checks expandable details and unmapped legacy actors, stable nonduplicate cursors,
+reload, malformed/foreign cursor errors and external/revoked denial.
+Ladders coverage opens the authenticated workspace/team directory, reuses the
+shared name alert dialog for create/rename and reloads persisted results. It
+checks profile-only field shapes, owner/editor/viewer boundaries, cross-app
+grant isolation, invalid/foreign writes, revocation, hash-free deep links and
+removal of anonymous evaluation/password routes from the runtime. All fixture
+members/teams/workspaces are local and removed; legacy identity linking is never
+inferred from email.
+Ladders profile coverage reuses the assessment's profile fields, planning-role
+selector and seniority template picker, saves/reloads and verifies immutable
+legacy tokens, account/owner IDs, creation dates and evaluation history. It checks
+editor saving, viewer read-only fields, foreign/missing member rejection, invalid
+inputs and visible save errors after revocation. Planning-role changes update the
+Planner roster only under its separate app grant.
+Ladders deletion coverage checks owner-only controls/API, cancellation before any
+write, member-record cascades, disabled nonempty teams, visible default-team and
+revoked-delete errors, foreign-target rejection and persistence after deletion.
+The workspace and grants remain, with legacy automatic-container cleanup disabled
+transactionally. Database integration also verifies surviving member/account/history
+records and Shiplog application retention when its team association clears.
+Ladders creation coverage uses the shared profile form from a team link, verifies
+ID-only response, persistent member-route replacement and directory reload,
+unlinked legacy account and owner storage metadata, viewer/foreign denial and
+visible revoked-save failures with no partial member. Database integration also
+tests direct runtime INSERT denial, retained legacy insert authorization and
+atomic rollback of invalid profiles.
+Ladders move coverage selects a destination using UI's shared team selector,
+checks no write before explicit save, reloads the persistent association and
+verifies profile/tokens/history retention and directory placement. It checks
+viewer/foreign/invalid/revoked moves and visible errors without changing teams.
+Database integration additionally verifies preserved linked accounts, goals,
+evaluations, invitations and vacations; linked-account conflicts roll back,
+same-team calls are idempotent and legacy owner/unauthenticated checks remain.
+Ladders evaluation-history coverage follows the profile's Versions link, reuses
+version selection/comparisons, reloads a hash-free deep link and checks the
+language selector/footer and profile navigation. It verifies manager/peer and
+published self history, excludes private self drafts from both API and DOM,
+keeps status/deletion controls disabled, rejects foreign/invalid/revoked access
+and preserves every imported evaluation field. Database integration additionally
+checks all internal roles, same-email identity isolation, cross-app denial and
+direct runtime SELECT denial; internal hidden comments remain reviewer-visible.
+Ladders visibility coverage reuses the legacy assessment panel to share/hide
+manager, published-self and peer comments, reloads persisted settings and verifies
+independent categories. Viewers have no controls; revoked/malformed/missing-comment/
+wrong-member/private-self-draft writes fail without changing history content,
+status or timestamps. Database integration verifies legacy employee server-side
+redaction, default-hidden peer notes and draft-peer approval without publication.
+Ladders editing coverage uses the existing competency form and queued autosave
+hook, persists one manager draft, edits it in place and publishes the same ID.
+It verifies copied hidden-comment metadata, immutable published history,
+viewer read-only mode, independent peer publication, employee-owned self status
+and explicit revoked-autosave errors without a partial version. Database
+integration also checks duplicate-draft conflicts, foreign/invalid targets,
+creation-date/visibility retention and runtime direct INSERT/UPDATE denial.
+Ladders evaluation deletion coverage reuses the owner-only version-panel
+confirmation, checks cancel/no-write, editor/viewer/revoked/foreign rejection,
+and removes manager, peer and published self versions. It deletes a dirty
+manager draft only after its queued autosave settles; private self drafts remain
+unlisted and undeletable. Database integration checks scoped locks, direct
+runtime DELETE denial and the same private-self boundary.
+SMART goal coverage reuses the member profile panel and verifies viewer
+read-only access, editor creation/editing/progress/comments, owner-only deletion,
+revocation and scoped API permissions. Database integration checks preserved
+legacy comments, append-only manager comments, foreign-goal rejection and direct
+runtime table denial.
+Legacy account mapping coverage provisions an exact verified/legacy UUID pair
+through the local administrator tool, rejects a competing same-email subject,
+and proves mapping alone grants no workspace access. Explicit grants remain
+separate; unmapping leaves them intact and imported owner IDs do not change.
+Authenticated employee history coverage requires an explicit mapping and existing
+member-account link, denies same-email subjects and workspace managers access to
+private self drafts, redacts hidden comments and private reviewer drafts on the
+server, and verifies hash-free personal navigation/refresh and unmapping revocation.
+Self-evaluation coverage reuses the authenticated shared editor to autosave,
+reload, update and publish own drafts. It checks immutable published history,
+new draft creation, manager exclusion from private self drafts, cross-member and
+same-email denial, unchanged reviewer content and visible errors after unmapping.
+Employee goal coverage reuses the member progress/comment panel, checks manager
+definitions remain unchanged, blocks foreign goals and same-email managers,
+preserves appended member comments after reload and shows errors after unmapping.
+Peer-review coverage assigns a linked verified colleague with the shared selector,
+submits one private review through the reused assessment editor, verifies no
+directory/history access, checks independent manager publication, duplicate
+conflicts and revoked-assignment denial without deleting submitted evaluations.
+Member invitation coverage uses the manager profile panel and recipient's own
+account-ID page. It verifies invitation creation/revocation, same-email recipient
+isolation, decline/accept, personal self autosave without legacy mapping, no
+workspace grants, and confirmed unlink with preserved evaluation history.
+Database integration also covers expiry, rotation, concurrent one-use acceptance,
+duplicate-team links, legacy-mapping conflicts and peer submissions by directly
+linked accounts.
+Workspace lifecycle coverage creates a native workspace from the shared name
+dialog without changing legacy auth account counts. It invites an exact recipient
+as Planner external, verifies wrong-subject denial, accepts once, checks Planner
+read-only navigation with no Ladders grant, changes/removes the app role, creates
+native teams/members, rejects nonempty deletion and confirms/cancels empty deletion.
+Planner and Shiplog links reach the same management screen. Database integration
+also covers expiry, rotation, decline, concurrent consumption, owner protection,
+legacy ownership preservation, runtime privilege denial, audit retention and
+explicit busy conflicts instead of grant/workspace deadlocks.
+Pulse survey coverage uses native workspaces, the existing creation/answer dialogs
+and accessible keyboard ratings. It checks owner/editor management, viewer-only
+answering, wrong-subject denial, duplicate conflicts, hidden open/below-threshold
+aggregates, closed minimum-response distributions/comments, reload persistence,
+revocation, confirmed deletion and navigation to the shared workspace screen.
+No browser request is allowed off the local origin; legacy auth is never used.
+The suite contains 36 isolated migration scenarios, run with one worker and zero retries.
+Task coverage reuses the real feature form to create a project/task, save
+estimates and multiple-task dependencies, rename and change status, and reload
+persisted private details. It checks rejected cycles/estimates, confirmation
+cancellation, protected prerequisite deletion, viewer read-only controls,
+external private-data denial, owner deletion and revocation. Delete assertions
+wait for the actual API response, not a temporarily absent rendered card.
+Roadmap settings coverage verifies prerequisite-first inclusion in the reused
+modal, blocked prerequisite removal, persisted start dates, rejected impossible/
+unverified dates, unchanged task fields and viewer/revoked write denial.
+Do not run the historical default configs as migration tests: some authenticate
+and seed against remote services even when the browser URL says localhost.
+
 ## Shared account and public-link layouts
 
 `tests/ui/account-public-layout.spec.ts` checks shared account/login error
@@ -30,13 +220,14 @@ End-to-end testing repository for jordiorriols projects using Playwright.
 
 ## Projects Tested
 
-| Project | Production URL | Localhost URL |
-|---------|----------------|---------------|
-| Website | https://www.jordiorriols.cat | http://localhost:5173 |
-| Airmap | https://airmap.jordiorriols.cat | http://localhost:5174 |
-| Ladders | https://ladders.jordiorriols.cat | http://localhost:5175 |
-| Planner | Not configured | http://127.0.0.1:5176 |
-| UI Storybook | Not configured | http://127.0.0.1:6008 |
+| Project      | Production URL                   | Localhost URL         |
+| ------------ | -------------------------------- | --------------------- |
+| Website      | https://www.jordiorriols.cat     | http://localhost:5173 |
+| Airmap       | https://airmap.jordiorriols.cat  | http://localhost:5174 |
+| Ladders      | https://ladders.jordiorriols.cat | http://localhost:5175 |
+| Planner      | Not configured                   | http://127.0.0.1:5176 |
+| Shiplog      | Not configured                   | http://127.0.0.1:5178 |
+| UI Storybook | Not configured                   | http://127.0.0.1:6008 |
 
 ## Setup
 
@@ -64,11 +255,13 @@ same built UI Storybook. The suite verifies diagnostics, explicit keyboard
 recovery, disabled retry and desktop/mobile fallback readability.
 
 ### All Tests
+
 ```bash
 npm test
 ```
 
 ### By Project
+
 ```bash
 # Test a specific project (both localhost and production)
 npm run test:website
@@ -97,7 +290,16 @@ workspaces and Ladders teams/members, and delete only their own test data.
 Apply Planner's shared-team/vacation migration to the shared Supabase project
 before running the updated tests; both apps must use the same project.
 
+Start Shiplog's server on port 5178 and run
+`npx playwright test --project=shiplog-localhost --workers=1`. This suite uses
+the same account/environment helpers. It covers the Details/Changes/QA release
+tabs, atomic detail/status saves, multiple same-workspace Planner feature links,
+unlinking and reload persistence, Draft-only feature editing, name-only public
+output, QA/approvals, workspace sharing and mobile modal controls. Apply Shiplog's
+`20261031000000_shiplog_planner_features.sql` migration before running it.
+
 ### By Environment
+
 ```bash
 # Test all projects on localhost
 npm run test:localhost
@@ -107,6 +309,7 @@ npm run test:production
 ```
 
 ### Visual Tests Only
+
 ```bash
 # Run visual regression tests
 npm run test:visual
@@ -116,6 +319,7 @@ npm run test:visual:update
 ```
 
 ### Interactive Mode
+
 ```bash
 # Open Playwright UI
 npm run test:ui
@@ -137,6 +341,7 @@ npm run compare
 ```
 
 This will:
+
 1. Take screenshots of each page on production
 2. Take screenshots of the same pages on localhost
 3. Save them to `screenshots/comparison/` for manual comparison
@@ -201,6 +406,7 @@ test("home page snapshot @visual", async ({ page, takeSnapshot }) => {
 - `@smoke` - Smoke tests
 
 Run tests by tag:
+
 ```bash
 npx playwright test --grep @visual
 npx playwright test --grep @a11y
@@ -222,6 +428,7 @@ The `playwright.config.ts` defines projects for each app/environment combination
 ## Reports
 
 After running tests:
+
 ```bash
 npm run report
 ```
@@ -229,11 +436,13 @@ npm run report
 ## CI/CD Integration
 
 Tests can be run in CI with:
+
 ```bash
 CI=true npm test
 ```
 
 This enables:
+
 - GitHub Actions reporter
 - Single worker execution
 - Automatic retries on failure
