@@ -131,7 +131,12 @@ and removes manager, peer and published self versions. It deletes a dirty
 manager draft only after its queued autosave settles; private self drafts remain
 unlisted and undeletable. Database integration checks scoped locks, direct
 runtime DELETE denial and the same private-self boundary.
-All 27 isolated migration scenarios pass with one worker and zero retries.
+SMART goal coverage reuses the member profile panel and verifies viewer
+read-only access, editor creation/editing/progress/comments, owner-only deletion,
+revocation and scoped API permissions. Database integration checks preserved
+legacy comments, append-only manager comments, foreign-goal rejection and direct
+runtime table denial.
+All 28 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation

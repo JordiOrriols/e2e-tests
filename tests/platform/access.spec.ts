@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { test, expect, type APIRequestContext } from "@playwright/test";
+import { removeLocalAccount } from "./local-helpers";
 
 async function token(
   request: APIRequestContext,
@@ -25,39 +26,49 @@ test("missing or malformed Access tokens cannot read platform data", async ({
 test("verified new users have no permissions and keep their subject identity", async ({
   request,
 }) => {
-  const sub = `local-e2e-${randomUUID()}`;
-  const jwt = await token(request, { sub, email: "employee@example.com" });
-  const response = await request.get("/api/me", {
-    headers: { "Cf-Access-Jwt-Assertion": jwt },
-  });
-  expect(response.status()).toBe(200);
-  const account = await response.json();
-  expect(account.grants).toEqual([]);
-  const changed = await token(request, { sub, email: "renamed@example.com" });
-  const next = await request.get("/api/me", {
-    headers: { "Cf-Access-Jwt-Assertion": changed },
-  });
-  expect((await next.json()).id).toBe(account.id);
-});
-
-test("the same email does not inherit another subject's account", async ({
-  request,
-}) => {
-  const ids = [];
-  for (let i = 0; i < 2; i++) {
-    const jwt = await token(request, {
-      sub: `local-e2e-${randomUUID()}`,
-      email: "same@example.com",
-    });
+  let accountId: string | undefined;
+  try {
+    const sub = `local-e2e-${randomUUID()}`;
+    const jwt = await token(request, { sub, email: "employee@example.com" });
     const response = await request.get("/api/me", {
       headers: { "Cf-Access-Jwt-Assertion": jwt },
     });
     expect(response.status()).toBe(200);
     const account = await response.json();
+    accountId = account.id;
     expect(account.grants).toEqual([]);
-    ids.push(account.id);
+    const changed = await token(request, { sub, email: "renamed@example.com" });
+    const next = await request.get("/api/me", {
+      headers: { "Cf-Access-Jwt-Assertion": changed },
+    });
+    expect((await next.json()).id).toBe(account.id);
+  } finally {
+    if (accountId) removeLocalAccount(accountId);
   }
-  expect(ids[0]).not.toBe(ids[1]);
+});
+
+test("the same email does not inherit another subject's account", async ({
+  request,
+}) => {
+  const ids: string[] = [];
+  try {
+    for (let i = 0; i < 2; i++) {
+      const jwt = await token(request, {
+        sub: `local-e2e-${randomUUID()}`,
+        email: "same@example.com",
+      });
+      const response = await request.get("/api/me", {
+        headers: { "Cf-Access-Jwt-Assertion": jwt },
+      });
+      expect(response.status()).toBe(200);
+      const account = await response.json();
+      expect(account.grants).toEqual([]);
+      ids.push(account.id);
+    }
+    expect(ids[0]).not.toBe(ids[1]);
+  } finally {
+    for (const id of ids) removeLocalAccount(id);
+  }
 });
 
 test("wrong audience, issuer, expiry and absent user claims are rejected", async ({
