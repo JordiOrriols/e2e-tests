@@ -140,7 +140,11 @@ Legacy account mapping coverage provisions an exact verified/legacy UUID pair
 through the local administrator tool, rejects a competing same-email subject,
 and proves mapping alone grants no workspace access. Explicit grants remain
 separate; unmapping leaves them intact and imported owner IDs do not change.
-All 29 isolated migration scenarios pass with one worker and zero retries.
+Authenticated employee history coverage requires an explicit mapping and existing
+member-account link, denies same-email subjects and workspace managers access to
+private self drafts, redacts hidden comments and private reviewer drafts on the
+server, and verifies hash-free personal navigation/refresh and unmapping revocation.
+All 30 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
