@@ -136,7 +136,11 @@ read-only access, editor creation/editing/progress/comments, owner-only deletion
 revocation and scoped API permissions. Database integration checks preserved
 legacy comments, append-only manager comments, foreign-goal rejection and direct
 runtime table denial.
-All 28 isolated migration scenarios pass with one worker and zero retries.
+Legacy account mapping coverage provisions an exact verified/legacy UUID pair
+through the local administrator tool, rejects a competing same-email subject,
+and proves mapping alone grants no workspace access. Explicit grants remain
+separate; unmapping leaves them intact and imported owner IDs do not change.
+All 29 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
