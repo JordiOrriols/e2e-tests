@@ -148,7 +148,10 @@ Self-evaluation coverage reuses the authenticated shared editor to autosave,
 reload, update and publish own drafts. It checks immutable published history,
 new draft creation, manager exclusion from private self drafts, cross-member and
 same-email denial, unchanged reviewer content and visible errors after unmapping.
-All 31 isolated migration scenarios pass with one worker and zero retries.
+Employee goal coverage reuses the member progress/comment panel, checks manager
+definitions remain unchanged, blocks foreign goals and same-email managers,
+preserves appended member comments after reload and shows errors after unmapping.
+All 32 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
