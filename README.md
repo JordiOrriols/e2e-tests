@@ -112,7 +112,13 @@ keeps status/deletion controls disabled, rejects foreign/invalid/revoked access
 and preserves every imported evaluation field. Database integration additionally
 checks all internal roles, same-email identity isolation, cross-app denial and
 direct runtime SELECT denial; internal hidden comments remain reviewer-visible.
-All 24 isolated migration scenarios pass with one worker and zero retries.
+Ladders visibility coverage reuses the legacy assessment panel to share/hide
+manager, published-self and peer comments, reloads persisted settings and verifies
+independent categories. Viewers have no controls; revoked/malformed/missing-comment/
+wrong-member/private-self-draft writes fail without changing history content,
+status or timestamps. Database integration verifies legacy employee server-side
+redaction, default-hidden peer notes and draft-peer approval without publication.
+All 25 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
