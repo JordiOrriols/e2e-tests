@@ -151,7 +151,11 @@ same-email denial, unchanged reviewer content and visible errors after unmapping
 Employee goal coverage reuses the member progress/comment panel, checks manager
 definitions remain unchanged, blocks foreign goals and same-email managers,
 preserves appended member comments after reload and shows errors after unmapping.
-All 32 isolated migration scenarios pass with one worker and zero retries.
+Peer-review coverage assigns a linked verified colleague with the shared selector,
+submits one private review through the reused assessment editor, verifies no
+directory/history access, checks independent manager publication, duplicate
+conflicts and revoked-assignment denial without deleting submitted evaluations.
+All 33 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
