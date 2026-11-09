@@ -118,7 +118,14 @@ independent categories. Viewers have no controls; revoked/malformed/missing-comm
 wrong-member/private-self-draft writes fail without changing history content,
 status or timestamps. Database integration verifies legacy employee server-side
 redaction, default-hidden peer notes and draft-peer approval without publication.
-All 25 isolated migration scenarios pass with one worker and zero retries.
+Ladders editing coverage uses the existing competency form and queued autosave
+hook, persists one manager draft, edits it in place and publishes the same ID.
+It verifies copied hidden-comment metadata, immutable published history,
+viewer read-only mode, independent peer publication, employee-owned self status
+and explicit revoked-autosave errors without a partial version. Database
+integration also checks duplicate-draft conflicts, foreign/invalid targets,
+creation-date/visibility retention and runtime direct INSERT/UPDATE denial.
+All 26 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
