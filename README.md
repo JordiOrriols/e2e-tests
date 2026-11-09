@@ -125,7 +125,13 @@ viewer read-only mode, independent peer publication, employee-owned self status
 and explicit revoked-autosave errors without a partial version. Database
 integration also checks duplicate-draft conflicts, foreign/invalid targets,
 creation-date/visibility retention and runtime direct INSERT/UPDATE denial.
-All 26 isolated migration scenarios pass with one worker and zero retries.
+Ladders evaluation deletion coverage reuses the owner-only version-panel
+confirmation, checks cancel/no-write, editor/viewer/revoked/foreign rejection,
+and removes manager, peer and published self versions. It deletes a dirty
+manager draft only after its queued autosave settles; private self drafts remain
+unlisted and undeletable. Database integration checks scoped locks, direct
+runtime DELETE denial and the same private-self boundary.
+All 27 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
@@ -168,14 +174,14 @@ End-to-end testing repository for jordiorriols projects using Playwright.
 
 ## Projects Tested
 
-| Project | Production URL | Localhost URL |
-|---------|----------------|---------------|
-| Website | https://www.jordiorriols.cat | http://localhost:5173 |
-| Airmap | https://airmap.jordiorriols.cat | http://localhost:5174 |
-| Ladders | https://ladders.jordiorriols.cat | http://localhost:5175 |
-| Planner | Not configured | http://127.0.0.1:5176 |
-| Shiplog | Not configured | http://127.0.0.1:5178 |
-| UI Storybook | Not configured | http://127.0.0.1:6008 |
+| Project      | Production URL                   | Localhost URL         |
+| ------------ | -------------------------------- | --------------------- |
+| Website      | https://www.jordiorriols.cat     | http://localhost:5173 |
+| Airmap       | https://airmap.jordiorriols.cat  | http://localhost:5174 |
+| Ladders      | https://ladders.jordiorriols.cat | http://localhost:5175 |
+| Planner      | Not configured                   | http://127.0.0.1:5176 |
+| Shiplog      | Not configured                   | http://127.0.0.1:5178 |
+| UI Storybook | Not configured                   | http://127.0.0.1:6008 |
 
 ## Setup
 
@@ -203,11 +209,13 @@ same built UI Storybook. The suite verifies diagnostics, explicit keyboard
 recovery, disabled retry and desktop/mobile fallback readability.
 
 ### All Tests
+
 ```bash
 npm test
 ```
 
 ### By Project
+
 ```bash
 # Test a specific project (both localhost and production)
 npm run test:website
@@ -245,6 +253,7 @@ output, QA/approvals, workspace sharing and mobile modal controls. Apply Shiplog
 `20261031000000_shiplog_planner_features.sql` migration before running it.
 
 ### By Environment
+
 ```bash
 # Test all projects on localhost
 npm run test:localhost
@@ -254,6 +263,7 @@ npm run test:production
 ```
 
 ### Visual Tests Only
+
 ```bash
 # Run visual regression tests
 npm run test:visual
@@ -263,6 +273,7 @@ npm run test:visual:update
 ```
 
 ### Interactive Mode
+
 ```bash
 # Open Playwright UI
 npm run test:ui
@@ -284,6 +295,7 @@ npm run compare
 ```
 
 This will:
+
 1. Take screenshots of each page on production
 2. Take screenshots of the same pages on localhost
 3. Save them to `screenshots/comparison/` for manual comparison
@@ -348,6 +360,7 @@ test("home page snapshot @visual", async ({ page, takeSnapshot }) => {
 - `@smoke` - Smoke tests
 
 Run tests by tag:
+
 ```bash
 npx playwright test --grep @visual
 npx playwright test --grep @a11y
@@ -369,6 +382,7 @@ The `playwright.config.ts` defines projects for each app/environment combination
 ## Reports
 
 After running tests:
+
 ```bash
 npm run report
 ```
@@ -376,11 +390,13 @@ npm run report
 ## CI/CD Integration
 
 Tests can be run in CI with:
+
 ```bash
 CI=true npm test
 ```
 
 This enables:
+
 - GitHub Actions reporter
 - Single worker execution
 - Automatic retries on failure
