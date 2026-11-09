@@ -144,7 +144,11 @@ Authenticated employee history coverage requires an explicit mapping and existin
 member-account link, denies same-email subjects and workspace managers access to
 private self drafts, redacts hidden comments and private reviewer drafts on the
 server, and verifies hash-free personal navigation/refresh and unmapping revocation.
-All 30 isolated migration scenarios pass with one worker and zero retries.
+Self-evaluation coverage reuses the authenticated shared editor to autosave,
+reload, update and publish own drafts. It checks immutable published history,
+new draft creation, manager exclusion from private self drafts, cross-member and
+same-email denial, unchanged reviewer content and visible errors after unmapping.
+All 31 isolated migration scenarios pass with one worker and zero retries.
 Task coverage reuses the real feature form to create a project/task, save
 estimates and multiple-task dependencies, rename and change status, and reload
 persisted private details. It checks rejected cycles/estimates, confirmation
